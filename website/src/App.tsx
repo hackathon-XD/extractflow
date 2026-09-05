@@ -1,4 +1,18 @@
+/**
+ * ExtractFlow AI — Marketing Website
+ * Copyright (c) 2025 github.com/al13n-x-v0x | Discord: al13n._.invisible
+ * All rights reserved. Unauthorized reproduction is prohibited.
+ */
 import { useState, useEffect, useRef, useCallback } from 'react'
+
+/* ═══ Anti-Copy Protection ═══ */
+if (typeof window !== 'undefined') {
+  document.addEventListener('contextmenu', e => e.preventDefault())
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'u') e.preventDefault()
+    if (e.key === 'F12') e.preventDefault()
+  })
+}
 
 /* ═══ Intersection Observer hook ═══ */
 function useReveal(threshold = 0.15) {
@@ -508,7 +522,7 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <I.Sparkles style={{ width: 18, height: 18, color: 'var(--accent)' }} />
             <span style={{ fontSize: 14, fontWeight: 700 }}>ExtractFlow AI</span>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>MIT License</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>© 2025 github.com/al13n-x-v0x · Discord: al13n._.invisible</span>
           </div>
           <div style={{ display: 'flex', gap: 24 }}>
             <a href="https://github.com/hackathon-XD/extractflow" target="_blank" rel="noreferrer" style={{ color: 'var(--text-muted)', fontSize: 13, textDecoration: 'none' }}>GitHub</a>
