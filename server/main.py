@@ -473,143 +473,140 @@ def score_chunks(chunks, query, k=5):
 
 
 def smart_extract(text, query, src_count=1):
-    """Pure Python intelligent extraction."""
-    STOP_WORDS = {'their','there','these','those','about','which','would','could','should','being','other','where','after','before','between','during','through','however','moreover','furthermore','additional','including','according','important','specific','different','available','information','particularly','significant','substantial','approximately','established','because','while','since','although','unless','within','without','already','also','just','only','even','still','much','many','some','than','them','then','that','this','have','been','from','with','each','will','into','more','than','very','what','when','how','who','its','are','was','for','not','but','can','may','one','two','get','got','say','said','use','used','new','old','like','make','made','well','back','over','come','take','look','only','own','same','tell','know','see','want','give','first','last','long','great','little','right','high','left','large','next','early','young','important','few','public','bad','same','able','last'}
-    query_words = [w.lower() for w in re.split(r'\W+', query) if len(w) > 2 and w.lower() not in STOP_WORDS]
-    # Detect query intent
-    is_question = any(query.lower().startswith(w) for w in ['what','who','where','when','why','how','which','can','do','does','is','are','was','were'])
-    is_summary = any(w in query.lower() for w in ['summarize','summary','overview','main','key','important','highlight','tldr','brief'])
-    is_list = any(w in query.lower() for w in ['list','enumerate','name','tell me all','every','all'])
-    is_stats = any(w in query.lower() for w in ['statistic','number','data','figure','amount','how much','how many','percentage','value'])
-    is_comparison = any(w in query.lower() for w in ['compare','difference','versus','vs','better','worse','similar'])
-    paragraphs = [p.strip() for p in text.split('\n\n') if len(p.strip()) > 30]
+    """Pure Python extraction that actually answers the query."""
+    JUNK = {'https','http','www','com','org','net','html','css','jpg','png','pdf','src','alt','href','div','class','style','script','font','color','width','height','data','type','name','value','label','text','icon','svg','role','size','item','nav','tab','btn','btn','row','col','img','use','var','let','const','true','false','null','none','auto','left','right','top','bottom','center','block','inline','flex','grid','wrap','hidden','visible','scroll','pointer','cursor','hover','focus','active','disabled','content','container','wrapper','wrapper','header','footer','section','article','aside','column','sidebar','toolbar','dropdown','modal','overlay','popup','tooltip','badge','avatar','status','error','warning','success','info','debug','trace','level','log','msg','msg','api','url','get','post','put','del','req','res','err','try','catch','func','arg','param','ret','val','key','num','str','obj','arr','map','set','list','item','pos','neg','pos','min','max','sum','avg','inc','dec','upd','add','rem','sel','des','asc','desc','limit','offset','page','size','sort','filter','search','query','match','find','load','save','open','close','show','hide','start','stop','play','pause','next','prev','back','prev','undo','redo','copy','cut','paste','move','drag','drop','click','dbl','tap','swipe','pinch','zoom','pan','scroll','resize','rotate','flip','spin','float','fade','slide','scale','stretch','compress','expand','collapse','lock','unlock','enable','disable','check','uncheck','toggle','switch','swap','mix','blend','mask','clip','crop','trim','split','merge','join','concat','push','pull','shift','unshift','slice','splice','splice','fill','reset','clear','flush','drain','retry','abort','cancel','skip','pass','fail','done','busy','idle','wait','sleep','delay','debounce','throttle','batch','queue','stack','heap','tree','node','edge','link','path','port','host','port','ping','pong','ack','nack','syn','fin','rst','ack','msg','ack','err','ok','yes','nan','inf','nil','nul','eol','eof','bol','bos','eos','bos','crlf','lf','cr','tab','bsp','esc','nul','bel','soh','stx','etx','eot','enq','ack','bel','bs','ht','lf','vt','ff','cr','so','si','dle','dc1','dc2','dc3','dc4','nak','syn','etb','can','em','sub','esc','fs','gs','rs','us','space'}
+    # Step 1: Clean sentences
+    paragraphs = [p.strip() for p in text.split('\n\n') if len(p.strip()) > 20]
     sentences = []
-    SKIP = re.compile(r'(^(?:https?://|www\.|[a-z]+\.(com|org|net)|\d+\s*$|^\s*[A-Z][a-z]+\s*$|^[^a-zA-Z]*$|^\s*$|:^|,\s*$))', re.I)
     for p in paragraphs:
-        for s in re.split(r'(?<=[.!?])\s+', p):
-            s = re.sub(r'\s+', ' ', s).strip()
-            # Clean junk: remove URLs, standalone numbers, single words, HTML
+        raw_sents = re.split(r'(?<=[.!?])\s+', p)
+        for s in raw_sents:
             s = re.sub(r'https?://\S+', '', s)
             s = re.sub(r'<[^>]+>', '', s)
             s = re.sub(r'\[\d+\]', '', s)
             s = re.sub(r'\s+', ' ', s).strip()
-            # Skip garbage sentences
             if len(s) < 30: continue
-            if not any(c.isalpha() for c in s): continue
-            if s.count('\n') > 2: continue
-            # Must contain actual words (not just punctuation/numbers)
             words = re.findall(r'\b[a-zA-Z]{3,}\b', s)
-            if len(words) < 5: continue
+            if len(words) < 4: continue
+            # Skip sentences that are mostly list/HTML fragments
+            if s.count(',') > 5 and len(s.split(',')) > len(s.split('.')): continue
+            # Skip wiki-style navigation lists
+            if re.match(r'^[A-Z][a-z]+\s*$', s): continue
+            if re.match(r'^[A-Z][a-z]+(\s+[A-Z][a-z]+)+\s*$', s) and len(s) < 60: continue
             if s[-1] not in '.!?': s += '.'
             sentences.append(s)
     if not sentences:
-        return f"I found {src_count} source(s) but couldn't extract meaningful sentences. Try rephrasing your question."
-    # TF-IDF-like scoring
+        return f"I analyzed {src_count} source(s) but couldn't extract meaningful content. Try adding more sources or rephrasing your question."
+    # Step 2: Detect intent
+    ql = query.lower().strip()
+    is_greeting = bool(re.match(r'^(hi|hello|hey|yo|sup|howdy|greetings|how are you|what\'?s up)\b', ql))
+    is_summary = any(w in ql for w in ['summarize','summary','overview','main','key','important','highlight','tldr','brief','give me'])
+    is_list = any(w in ql for w in ['list','enumerate','name','every','all ','all'])
+    is_stats = any(w in ql for w in ['statistic','number','data','figure','amount','how much','how many','percentage','value','metric','count'])
+    is_question = any(ql.startswith(w) for w in ['what','who','where','when','why','how','which','can ','do ','does ','is ','are ','was ','were ','tell'])
+    # Step 3: Extract meaningful query words
+    query_words = [w.lower() for w in re.split(r'\W+', query) if len(w) > 2 and w.lower() not in JUNK and not w.isdigit()]
+    # Step 4: Score sentences
     doc_freq = {}
-    total_docs = max(len(paragraphs), 1)
     for p in paragraphs:
-        words_in_p = set(w.lower() for w in re.split(r'\W+', p) if len(w) > 2)
-        for w in words_in_p:
+        for w in set(w.lower() for w in re.split(r'\W+', p) if len(w) > 2):
             doc_freq[w] = doc_freq.get(w, 0) + 1
+    total_docs = max(len(paragraphs), 1)
     scored = []
     for i, s in enumerate(sentences):
         sl = s.lower()
         score = 0
-        # Query word relevance with TF-IDF weighting
+        # TF-IDF scoring for query words
         for w in query_words:
             tf = sl.count(w)
-            df = doc_freq.get(w, 1)
-            idf = max(0.1, 1.0 - df / total_docs)
-            score += tf * (1 + idf * 3)
-        # Bigram matching for phrases
-        for j in range(len(query_words) - 1):
-            bigram = query_words[j] + ' ' + query_words[j+1]
-            if bigram in sl: score += 5
-        # Bonus for numbers/statistics
-        nums = re.findall(r'\d+[\.,]?\d*\s*(?:%|billion|million|trillion|GW|GWh|kWh|percent|USD|dollars)', sl, re.I)
-        score += len(nums) * 3 if is_stats else len(nums)
-        # Bonus for sentences that directly answer questions
-        if is_question:
-            if any(sl.lower().startswith(w) for w in ['yes','no','the ','it ','this ','they ']): score += 4
-            if ':' in s: score += 2  # Definitions often have colons
-            if any(c.isdigit() for c in s) and is_stats: score += 3
-        # Bonus for list-like content
-        if is_list and (s.count(',') >= 2 or ' and ' in sl): score += 2
-        # Position bonus (intro/conclusion are usually more important)
-        if i < len(sentences) * 0.15: score += 2
+            if tf > 0:
+                idf = 1.0 - doc_freq.get(w, 1) / total_docs
+                score += tf * (1 + max(idf, 0.1) * 3)
+        # Bonus: numbers when asking for stats
+        if is_stats:
+            nums = re.findall(r'\d+[\.,]?\d*\s*(?:%|billion|million|trillion|GW|GWh|kWh|percent|USD|dollars)', sl, re.I)
+            score += len(nums) * 5
+            # Any sentence with a number gets a bump
+            if re.search(r'\d', s): score += 2
+        # Bonus: question-answer patterns
+        if is_question or is_summary:
+            if ':' in s: score += 2
+            if any(sl.startswith(w) for w in ['the ','it ','this ','they ','in ','according']): score += 3
+        # Position bonus
+        if i < len(sentences) * 0.1: score += 3
+        elif i < len(sentences) * 0.2: score += 1
         if i > len(sentences) * 0.85: score += 2
-        # Penalty for very short or very long
-        if len(s) > 350: score -= 2
-        if len(s) < 40: score -= 1
+        # Length penalty
+        if len(s) > 300: score -= 2
         if score > 0:
             scored.append((score, i, s))
     scored.sort(key=lambda x: (-x[0], x[1]))
-    # Deduplicate and get top results
+    # Deduplicate
     top = []
-    seen_keys = set()
-    for score, idx, s in scored:
-        key = s[:60].lower()
-        if key not in seen_keys:
-            seen_keys.add(key)
-            top.append((score, idx, s))
-        if len(top) >= 10: break
-    if not top:
-        # Fallback: find sentences with most data
-        general = [(len(re.findall(r'\d+', s)) + len(re.findall(r'[A-Z][a-z]+', s)), i, s) for i, s in enumerate(sentences)]
-        general.sort(key=lambda x: -x[0])
-        top = general[:5]
-    # Extract structured data
-    all_numbers = re.findall(r'\$?[\d,]+\.?\d*\s*(?:%|billion|million|trillion|GW|GWh|kWh|percent|USD|dollars|euros|£)', text, re.I)
-    all_dates = re.findall(r'\b(?:20[0-2]\d|19\d{2})\b', text)
-    all_urls = re.findall(r'https?://[^\s<>"\']+', text)
-    # Word frequency for topics
+    seen = set()
+    for sc, idx, s in scored:
+        key = s[:50].lower()
+        if key not in seen:
+            seen.add(key)
+            top.append(s)
+        if len(top) >= (10 if is_summary or is_list else 6): break
+    # Step 5: Build clean topic list
+    TOPIC_STOP = JUNK | {'about','their','there','these','those','which','would','could','should','being','where','after','before','between','during','through','however','moreover','furthermore','including','according','specific','different','particularly','significant','substantial','approximately','established','because','while','since','although','unless','within','without','already','also','just','only','even','still','much','many','some','than','them','then','that','this','have','been','from','with','each','will','into','very','what','when','how','who','its','are','was','for','not','but','can','may','one','two','get','got','say','said','use','used','new','old','like','make','made','well','back','over','come','take','look','own','same','tell','know','see','want','give','first','last','long','great','little','right','high','left','large','next','early','young','few','public','bad','able','file','user','admin','server','client','window','document','element','event','function','return','import','export','default','class','extends','super','constructor','method','property','prototype','module','require','package','namespace','interface','abstract','implements','public','private','protected','static','final','void','null','undefined','boolean','string','number','array','object','symbol','bigint','function','async','await','yield','generator','iterator','proxy','reflect','map','weakmap','set','weakset','promise','date','regexp','error','math','json','console','global','buffer','process','stream','channel','socket','http','https','ftp','ssh','dns','tcp','udp','ip','url','uri','urn','api','rest','soap','graphql','grpc','websocket','socket','cors','csrf','xss','sql','nosql','redis','memcache','elasticsearch','kafka','rabbitmq','celery','nginx','apache','docker','kubernetes','terraform','ansible','jenkins','github','gitlab','bitbucket','jira','confluence','slack','discord','teams','zoom','skype','google','microsoft','amazon','azure','cloud','aws','gcp','lambda','s3','ec2','rds','dynamo','sqs','sns','cloudwatch','iam','vpc','cdn','dns','ssl','tls','cert','key','token','session','cookie','header','body','status','code','response','request','method','route','endpoint','handler','middleware','controller','service','repository','model','schema','migration','seed','fixture','factory','test','spec','mock','stub','spy','assert','expect','describe','it','before','after','each','all','suite','runner','report','coverage','lint','format','build','bundle','compile','transpile','minify','uglify','tree','shake','hot','reload','live','module','chunk','asset','resource','source','target','input','output','stream','pipe','transform','filter','map','reduce','flat','sort','reverse','splice','slice','concat','join','split','trim','pad','repeat','replace','match','search','indexOf','last','includes','startsWith','endsWith','every','some','find','findIndex','keys','values','entries','from','assign','freeze','seal','create','define','property','descriptor','enumerable','configurable','writable','value','get','set','has','delete','own','keys','prevent','extensions','is','frozen','sealed','extensible','prototype','constructor','toString','valueOf','toLocale','string','number','boolean','symbol','bigint'}
     word_freq = {}
     for w in re.split(r'\W+', text.lower()):
-        if len(w) > 4 and w not in STOP_WORDS:
+        if len(w) > 4 and w not in TOPIC_STOP:
             word_freq[w] = word_freq.get(w, 0) + 1
-    top_topics = sorted(word_freq.items(), key=lambda x: -x[1])[:8]
-    # ═══ BUILD THE RESPONSE ═══
+    # Keep only words that appear at least 2x and aren't proper nouns from fragments
+    topics = [(w, c) for w, c in word_freq.items() if c >= 2]
+    topics.sort(key=lambda x: -x[1])
+    # Filter out very common junk
+    topics = [t for t in topics if t[0] not in {'http','https','www','com','org','net','html','div','class','span','font','color','style','width','height','margin','padding','border','background','display','flex','grid','none','auto','inherit','initial','unset','normal','bold','italic','left','right','center','middle','top','bottom','block','inline','relative','absolute','fixed','sticky','hidden','visible','scroll','overflow','z','index','opacity','transition','animation','transform','cursor','pointer','user','select','outline','text','decoration','alignment','position','vertical','horizontal','content','justify','align','wrap','nowrap','gap','row','column','item','self','start','end','stretch','space','between','around','evenly','float','clear','white','space','break','word','letter','line','height','family','size','weight','variant','stretch','rendering','webkit','moz','ms','filter','backdrop','mask','clip','image','radial','linear','repeating','conic','color','stop','offset','path','polygon','circle','ellipse','inset','calc','var','env','clamp','min','max','viewport','container','media','feature','selector','pseudo','before','after','first','last','nth','not','has','is','where','host','scope','active','hover','focus','visited','checked','disabled','enabled','required','optional','valid','invalid','placeholder','read','only','write','input','textarea','select','option','button','form','fieldset','legend','label','output','progress','meter','datalist','keygen','details','summary','dialog','menu','menuitem','template','slot','shadow','slot','part','host'}]
+    # Step 6: Build response
     response = ''
-    # Smart title based on intent
+    if is_greeting:
+        return f"Hello! I have **{src_count} source(s)** loaded in this notebook. I can help you:\n\n• **Summarize** the content\n• **Find specific information** by asking questions\n• **List statistics** and key data points\n• **Compare** different sections\n\nWhat would you like to know?"
+    # Header
     if is_summary:
-        response += f"## Summary\n\n"
+        response += f'## Summary\n\n'
     elif is_stats:
-        response += f"## Statistics & Data\n\n"
+        response += f'## Statistics & Data\n\n'
     elif is_list:
-        response += f"## Complete List\n\n"
-    elif is_comparison:
-        response += f"## Comparison\n\n"
+        response += f'## Key Items\n\n'
     elif is_question:
-        response += f"## Answer\n\n"
+        response += f'## Answer\n\n'
     else:
-        response += f"## Analysis\n\n"
-    # Topic overview (always show)
-    if top_topics:
-        response += f"**Primary topics across {src_count} source(s):** {', '.join(t[0].title() for t in top_topics[:5])}\n\n"
-    # Direct answer sentences
-    max_results = 8 if is_summary or is_list else 5
-    response += "**Key findings:**\n\n"
-    for i, (score, idx, s) in enumerate(top[:max_results], 1):
-        clean = s.strip()
-        if len(clean) > 250: clean = clean[:247] + '...'
-        # Bold numbers for emphasis
+        response += f'## Analysis\n\n'
+    # Topics (only show meaningful ones)
+    if topics:
+        topic_str = ', '.join(t[0].title() for t in topics[:5])
+        response += f'**Topics:** {topic_str}\n\n'
+    # Results
+    if not top:
+        response += f'I searched your {src_count} source(s) but found no strong matches for "{query}".\n\n**Suggestions:**\n• Try different keywords\n• Add more source documents\n• Ask a more specific question'
+        return response.strip()
+    response += '**Findings:**\n\n'
+    for i, s in enumerate(top[:8 if is_summary else 5], 1):
+        clean = s[:280] + ('...' if len(s) > 280 else '')
+        # Bold statistics
         clean = re.sub(r'(?<!\d)(\d+[\.,]?\d*\s*(?:%|billion|million|trillion|GW|GWh|kWh|percent|USD|dollars))', r'**\1**', clean, flags=re.I)
-        response += f"{i}. {clean}\n\n"
-    # Statistics section
-    if all_numbers and (is_stats or is_summary or len(all_numbers) >= 3):
-        unique_nums = list(dict.fromkeys(all_numbers))[:8]
-        response += "**Key statistics:**\n"
-        for n in unique_nums:
-            response += f"• {n.strip()}\n"
-        response += "\n"
-    # Dates if relevant
-    if all_dates and is_question:
-        unique_dates = sorted(set(all_dates))[:5]
-        response += f"**Dates mentioned:** {', '.join(unique_dates)}\n\n"
-    # Relevance score
+        response += f'{i}. {clean}\n\n'
+    # Query-relevant statistics
+    if is_stats and query_words:
+        # Find numbers near query words
+        relevant_nums = []
+        for m in re.finditer(r'(?i)([\d,\.]+\s*(?:%|billion|million|trillion|GW|GWh|kWh|percent|dollars|USD))', text):
+            context = text[max(0,m.start()-100):m.end()+100].lower()
+            if any(w in context for w in query_words):
+                relevant_nums.append(m.group(0).strip())
+        if relevant_nums:
+            response += '**Statistics:**\n'
+            for n in list(dict.fromkeys(relevant_nums))[:8]:
+                response += f'• {n}\n'
+            response += '\n'
+    # Relevance footer
     if query_words:
-        total_mentions = sum(text.lower().count(w) for w in query_words)
-        response += f"---\n*Found {total_mentions} relevant mentions across {src_count} source(s).*"
+        mentions = sum(text.lower().count(w) for w in query_words)
+        response += f'---\n*{mentions} mentions found across {src_count} source(s)*'
     return response.strip()
 
 
