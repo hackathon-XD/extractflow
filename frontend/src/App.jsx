@@ -3,8 +3,37 @@
  * Copyright (c) 2025 github.com/al13n-x-v0x | Discord: al13n._.invisible
  * All rights reserved.
  */
-import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
+import { useState, useEffect, useCallback, useRef, Fragment, useMemo } from 'react'
 const API = '/api'
+
+/* ═══ Markdown Renderer (no deps) ═══ */
+function RenderMd({ text }) {
+  if (!text) return null
+  const html = useMemo(() => {
+    let h = text
+    // Escape HTML
+    h = h.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    // Headers
+    h = h.replace(/^## (.+)$/gm, '<h3 class="md-h3">$1</h3>')
+    h = h.replace(/^### (.+)$/gm, '<h4 class="md-h4">$1</h4>')
+    // Bold
+    h = h.replace(/\*\*(.+?)\*\*/g, '<strong class="md-bold">$1</strong>')
+    // Italic
+    h = h.replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Inline code
+    h = h.replace(/`([^`]+)`/g, '<code class="md-code">$1</code>')
+    // Horizontal rule
+    h = h.replace(/^---$/gm, '<hr class="md-hr"/>')
+    // Numbered lists
+    h = h.replace(/^\d+\. (.+)$/gm, '<div class="md-list-item"><span class="md-num"></span>$1</div>')
+    // Bullet lists
+    h = h.replace(/^[•\-] (.+)$/gm, '<div class="md-bullet">• $1</div>')
+    // Line breaks
+    h = h.replace(/\n/g, '<br/>')
+    return h
+  }, [text])
+  return <div className="md-content" dangerouslySetInnerHTML={{__html: html}} />
+}
 
 /* ═══ SVG Icons ═══ */
 const Icon = ({ d, size = 18, color = 'currentColor', sw = 2 }) => (
@@ -666,7 +695,7 @@ function NotebookView({ notebook, onBack, refresh }) {
                   </div>
                   <div className="msg-content">
                     <div className="msg-meta"><span className="msg-role">{m.role==='user'?'You':'ExtractFlow AI'}</span><span className="msg-time">{formatTime(m.createdAt)}</span></div>
-                    <div className="msg-bubble"><p>{m.content}</p></div>
+                    <div className="msg-bubble"><RenderMd text={m.content}/></div>
                     {m.role==='assistant' && (
                       <div className="msg-actions">
                         <button className="msg-action-btn" onClick={() => navigator.clipboard.writeText(m.content)} title="Copy"><Icon d={IC.copy} size={12}/></button>

@@ -473,70 +473,144 @@ def score_chunks(chunks, query, k=5):
 
 
 def smart_extract(text, query, src_count=1):
-    """Pure Python smart extraction - no AI needed."""
-    query_words = [w.lower() for w in re.split(r'\W+', query) if len(w) > 2]
-    # Split into sentences
-    sentences = [s.strip() for s in re.split(r'[.!?]+', text) if len(s.strip()) > 25]
+    """Pure Python intelligent extraction."""
+    STOP_WORDS = {'their','there','these','those','about','which','would','could','should','being','other','where','after','before','between','during','through','however','moreover','furthermore','additional','including','according','important','specific','different','available','information','particularly','significant','substantial','approximately','established','because','while','since','although','unless','within','without','already','also','just','only','even','still','much','many','some','than','them','then','that','this','have','been','from','with','each','will','into','more','than','very','what','when','how','who','its','are','was','for','not','but','can','may','one','two','get','got','say','said','use','used','new','old','like','make','made','well','back','over','come','take','look','only','own','same','tell','know','see','want','give','first','last','long','great','little','right','high','left','large','next','early','young','important','few','public','bad','same','able','last'}
+    query_words = [w.lower() for w in re.split(r'\W+', query) if len(w) > 2 and w.lower() not in STOP_WORDS]
+    # Detect query intent
+    is_question = any(query.lower().startswith(w) for w in ['what','who','where','when','why','how','which','can','do','does','is','are','was','were'])
+    is_summary = any(w in query.lower() for w in ['summarize','summary','overview','main','key','important','highlight','tldr','brief'])
+    is_list = any(w in query.lower() for w in ['list','enumerate','name','tell me all','every','all'])
+    is_stats = any(w in query.lower() for w in ['statistic','number','data','figure','amount','how much','how many','percentage','value'])
+    is_comparison = any(w in query.lower() for w in ['compare','difference','versus','vs','better','worse','similar'])
+    paragraphs = [p.strip() for p in text.split('\n\n') if len(p.strip()) > 30]
+    sentences = []
+    SKIP = re.compile(r'(^(?:https?://|www\.|[a-z]+\.(com|org|net)|\d+\s*$|^\s*[A-Z][a-z]+\s*$|^[^a-zA-Z]*$|^\s*$|:^|,\s*$))', re.I)
+    for p in paragraphs:
+        for s in re.split(r'(?<=[.!?])\s+', p):
+            s = re.sub(r'\s+', ' ', s).strip()
+            # Clean junk: remove URLs, standalone numbers, single words, HTML
+            s = re.sub(r'https?://\S+', '', s)
+            s = re.sub(r'<[^>]+>', '', s)
+            s = re.sub(r'\[\d+\]', '', s)
+            s = re.sub(r'\s+', ' ', s).strip()
+            # Skip garbage sentences
+            if len(s) < 30: continue
+            if not any(c.isalpha() for c in s): continue
+            if s.count('\n') > 2: continue
+            # Must contain actual words (not just punctuation/numbers)
+            words = re.findall(r'\b[a-zA-Z]{3,}\b', s)
+            if len(words) < 5: continue
+            if s[-1] not in '.!?': s += '.'
+            sentences.append(s)
     if not sentences:
-        return f"Found {len(sentences)} sentences across {src_count} source(s)."
-    # Score each sentence by query relevance
+        return f"I found {src_count} source(s) but couldn't extract meaningful sentences. Try rephrasing your question."
+    # TF-IDF-like scoring
+    doc_freq = {}
+    total_docs = max(len(paragraphs), 1)
+    for p in paragraphs:
+        words_in_p = set(w.lower() for w in re.split(r'\W+', p) if len(w) > 2)
+        for w in words_in_p:
+            doc_freq[w] = doc_freq.get(w, 0) + 1
     scored = []
     for i, s in enumerate(sentences):
         sl = s.lower()
-        score = sum(sl.count(w) for w in query_words)
-        # Bonus for numbers/statistics (often key info)
-        numbers = re.findall(r'\d+[\.\d]*\s*(?:%|billion|million|trillion|GW|GWh|kWh|percent|dollars|USD)', sl)
-        score += len(numbers) * 2
-        # Bonus for being near the start of a section
-        if i < len(sentences) * 0.2: score += 1
-        # Penalty for very long sentences
-        if len(s) > 300: score -= 1
+        score = 0
+        # Query word relevance with TF-IDF weighting
+        for w in query_words:
+            tf = sl.count(w)
+            df = doc_freq.get(w, 1)
+            idf = max(0.1, 1.0 - df / total_docs)
+            score += tf * (1 + idf * 3)
+        # Bigram matching for phrases
+        for j in range(len(query_words) - 1):
+            bigram = query_words[j] + ' ' + query_words[j+1]
+            if bigram in sl: score += 5
+        # Bonus for numbers/statistics
+        nums = re.findall(r'\d+[\.,]?\d*\s*(?:%|billion|million|trillion|GW|GWh|kWh|percent|USD|dollars)', sl, re.I)
+        score += len(nums) * 3 if is_stats else len(nums)
+        # Bonus for sentences that directly answer questions
+        if is_question:
+            if any(sl.lower().startswith(w) for w in ['yes','no','the ','it ','this ','they ']): score += 4
+            if ':' in s: score += 2  # Definitions often have colons
+            if any(c.isdigit() for c in s) and is_stats: score += 3
+        # Bonus for list-like content
+        if is_list and (s.count(',') >= 2 or ' and ' in sl): score += 2
+        # Position bonus (intro/conclusion are usually more important)
+        if i < len(sentences) * 0.15: score += 2
+        if i > len(sentences) * 0.85: score += 2
+        # Penalty for very short or very long
+        if len(s) > 350: score -= 2
+        if len(s) < 40: score -= 1
         if score > 0:
             scored.append((score, i, s))
     scored.sort(key=lambda x: (-x[0], x[1]))
-    # Get top relevant sentences
-    top = scored[:8]
+    # Deduplicate and get top results
+    top = []
+    seen_keys = set()
+    for score, idx, s in scored:
+        key = s[:60].lower()
+        if key not in seen_keys:
+            seen_keys.add(key)
+            top.append((score, idx, s))
+        if len(top) >= 10: break
     if not top:
-        # No keyword match — find general info sentences with numbers
-        general = [(len(re.findall(r'\d+', s)), i, s) for i, s in enumerate(sentences)]
+        # Fallback: find sentences with most data
+        general = [(len(re.findall(r'\d+', s)) + len(re.findall(r'[A-Z][a-z]+', s)), i, s) for i, s in enumerate(sentences)]
         general.sort(key=lambda x: -x[0])
         top = general[:5]
-    # Build response
-    lines = []
-    seen = set()
-    for score, idx, s in top:
-        # Deduplicate similar sentences
-        key = s[:50].lower()
-        if key not in seen:
-            seen.add(key)
-            lines.append(s)
-    # Detect numbers for summary stats
-    all_numbers = re.findall(r'\$?[\d,]+\.?\d*\s*(?:%|billion|million|trillion|GW|GWh|kWh|percent)', text, re.IGNORECASE)
-    # Detect topics
+    # Extract structured data
+    all_numbers = re.findall(r'\$?[\d,]+\.?\d*\s*(?:%|billion|million|trillion|GW|GWh|kWh|percent|USD|dollars|euros|£)', text, re.I)
+    all_dates = re.findall(r'\b(?:20[0-2]\d|19\d{2})\b', text)
+    all_urls = re.findall(r'https?://[^\s<>"\']+', text)
+    # Word frequency for topics
     word_freq = {}
     for w in re.split(r'\W+', text.lower()):
-        if len(w) > 4 and w not in {'their', 'there', 'these', 'those', 'about', 'which', 'would', 'could', 'should', 'being', 'other', 'where', 'after', 'before', 'between', 'during', 'through', 'should', 'however', 'moreover', 'furthermore', 'additional', 'including', 'according', 'important', 'specific', 'different', 'available', 'information', 'important', 'particularly', 'significant', 'substantial', 'approximately', 'established'}:
+        if len(w) > 4 and w not in STOP_WORDS:
             word_freq[w] = word_freq.get(w, 0) + 1
-    top_topics = sorted(word_freq.items(), key=lambda x: -x[1])[:6]
-    # Build the answer
-    response = f"**Analysis of your {src_count} source(s):**\n\n"
+    top_topics = sorted(word_freq.items(), key=lambda x: -x[1])[:8]
+    # ═══ BUILD THE RESPONSE ═══
+    response = ''
+    # Smart title based on intent
+    if is_summary:
+        response += f"## Summary\n\n"
+    elif is_stats:
+        response += f"## Statistics & Data\n\n"
+    elif is_list:
+        response += f"## Complete List\n\n"
+    elif is_comparison:
+        response += f"## Comparison\n\n"
+    elif is_question:
+        response += f"## Answer\n\n"
+    else:
+        response += f"## Analysis\n\n"
+    # Topic overview (always show)
     if top_topics:
-        response += f"**Key topics:** {', '.join(t[0].title() for t in top_topics)}\n\n"
-    if lines:
-        response += "**Most relevant findings:**\n\n"
-        for i, line in enumerate(lines[:6], 1):
-            # Clean up and truncate
-            clean = line.strip()
-            if len(clean) > 200: clean = clean[:200] + '...'
-            response += f"{i}. {clean}.\n\n"
-    if all_numbers:
-        response += f"**Key statistics mentioned:** {', '.join(all_numbers[:5])}\n\n"
-    # Add query-specific insight
+        response += f"**Primary topics across {src_count} source(s):** {', '.join(t[0].title() for t in top_topics[:5])}\n\n"
+    # Direct answer sentences
+    max_results = 8 if is_summary or is_list else 5
+    response += "**Key findings:**\n\n"
+    for i, (score, idx, s) in enumerate(top[:max_results], 1):
+        clean = s.strip()
+        if len(clean) > 250: clean = clean[:247] + '...'
+        # Bold numbers for emphasis
+        clean = re.sub(r'(?<!\d)(\d+[\.,]?\d*\s*(?:%|billion|million|trillion|GW|GWh|kWh|percent|USD|dollars))', r'**\1**', clean, flags=re.I)
+        response += f"{i}. {clean}\n\n"
+    # Statistics section
+    if all_numbers and (is_stats or is_summary or len(all_numbers) >= 3):
+        unique_nums = list(dict.fromkeys(all_numbers))[:8]
+        response += "**Key statistics:**\n"
+        for n in unique_nums:
+            response += f"• {n.strip()}\n"
+        response += "\n"
+    # Dates if relevant
+    if all_dates and is_question:
+        unique_dates = sorted(set(all_dates))[:5]
+        response += f"**Dates mentioned:** {', '.join(unique_dates)}\n\n"
+    # Relevance score
     if query_words:
-        relevant_counts = {w: text.lower().count(w) for w in query_words if text.lower().count(w) > 0}
-        if relevant_counts:
-            response += f"**Relevance:** Found {sum(relevant_counts.values())} mentions of your search terms across the sources.\n"
-    return response
+        total_mentions = sum(text.lower().count(w) for w in query_words)
+        response += f"---\n*Found {total_mentions} relevant mentions across {src_count} source(s).*"
+    return response.strip()
 
 
 def extract_key_topics(text):
