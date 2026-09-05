@@ -612,31 +612,39 @@ def notebook_generate(nid: str, type: str, body: dict = {}):
     nb_title = title[0] if title else "Notebook"
     if type == 'slides':
         result = generate_slides_content(all_text, nb_title)
-        return {"type":"slides", "data":result}
+        html = _render_slides_html(result)
+        return {"type":"slides", "data":result, "html":html}
     elif type == 'infographic':
         result = generate_infographic_content(all_text, nb_title)
-        return {"type":"infographic", "data":result}
+        html = _render_infographic_html(result)
+        return {"type":"infographic", "data":result, "html":html}
     elif type == 'mindmap':
         result = generate_mindmap(all_text, nb_title)
-        return {"type":"mindmap", "data":result}
+        html = _render_mindmap_html(result)
+        return {"type":"mindmap", "data":result, "html":html}
     elif type == 'podcast':
         result = generate_podcast_script(all_text, nb_title)
-        return {"type":"podcast", "data":result}
+        return {"type":"podcast", "data":result, "script":result}
+    elif type == 'video':
+        slides = generate_slides_content(all_text, nb_title)
+        podcast = generate_podcast_script(all_text, nb_title)
+        return {"type":"video", "data":{"slides":slides, "script":podcast}, "slides":slides, "script":podcast}
     elif type == 'flashcards':
-        sentences = [s.strip() for s in re.split(r'[.!?]+', all_text) if len(s.strip()) > 20][:10]
-        cards = [{"q": f"What about: {' '.join(s.split()[:6])}?", "a": ' '.join(s.split()[6:]).strip() + '.'} for s in sentences]
+        sentences = [s.strip() for s in re.split(r'[.!?]+', all_text) if len(s.strip()) > 20][:15]
+        cards = [{"q": f"What about: {' '.join(s.split()[:8])}?", "a": ' '.join(s.split()[8:]).strip() + '.'} for s in sentences]
         return {"type":"flashcards", "data":{"cards":cards, "count":len(cards)}}
     elif type == 'quiz':
-        sentences = [s.strip() for s in re.split(r'[.!?]+', all_text) if len(s.strip()) > 20][:8]
-        questions = [{"question": f"What does the source say about: {' '.join(s.split()[:5])}?", "options": ["Found in source", "Not mentioned", "Contradicted", "Partial match"], "answer": 0} for s in sentences]
+        sentences = [s.strip() for s in re.split(r'[.!?]+', all_text) if len(s.strip()) > 20][:10]
+        questions = [{"question": f"What does the source say about: {' '.join(s.split()[:6])}?", "options": ["Found in source", "Not mentioned", "Contradicted", "Partial match"], "answer": 0} for s in sentences]
         return {"type":"quiz", "data":{"questions":questions, "count":len(questions)}}
     elif type == 'summary':
         topics = extract_key_topics(all_text)
-        sentences = [s.strip() for s in re.split(r'[.!?]+', all_text) if len(s.strip()) > 20][:5]
-        return {"type":"summary", "data":{"title":nb_title, "keyPoints":sentences, "topics":[t['topic'] for t in topics[:8]], "wordCount":len(all_text.split())}}
+        sentences = [s.strip() for s in re.split(r'[.!?]+', all_text) if len(s.strip()) > 20][:8]
+        paras = [p.strip() for p in all_text.split('\n\n') if len(p.strip()) > 30]
+        return {"type":"summary", "data":{"title":nb_title, "keyPoints":sentences, "topics":[t['topic'] for t in topics[:8]], "wordCount":len(all_text.split()), "sections":paras[:6]}}
     elif type == 'datatable':
         numbers = re.findall(r'\$?[\d,]+\.?\d*\s*(?:billion|million|trillion|GW|GWh|kWh|percent|%)', all_text, re.IGNORECASE)
-        return {"type":"datatable", "data":{"headers":["Metric","Value"],"rows":[[n,"Found in source"] for n in numbers[:10]]}}
+        return {"type":"datatable", "data":{"headers":["Metric","Value","Context"],"rows":[[n, 'Extracted from source', all_text[max(0,all_text.lower().find(n.lower())-50):all_text.lower().find(n.lower())+80][:100]] for n in numbers[:15]]}}
     return {"type":type, "data":{"message":f"Generation for {type} not yet implemented"}}
 
 

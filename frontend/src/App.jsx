@@ -740,73 +740,356 @@ function NotebookView({ notebook, onBack, refresh }) {
   )
 }
 
-/* ═══ GENERATED OUTPUT ═══ */
+/* ═══ GENERATED OUTPUT — REAL VISUALS ═══ */
 function GeneratedOutput({ data }) {
   const d = data.data || data
-  if (data.type === 'error') return <div className="output-error"><p>❌ {d.message || 'Generation failed'}</p><p>Make sure you have sources added and a model configured.</p></div>
 
-  if (data.type === 'slides') {
-    const slides = d.slides || d.data?.slides || []
-    const [idx, setIdx] = useState(0)
-    const s = slides[idx]
-    if (!s) return <pre className="output-raw">{JSON.stringify(d,null,2)}</pre>
+  if (data.type === 'error') return (
+    <div className="output-error" style={{textAlign:'center',padding:40}}>
+      <p style={{fontSize:40,marginBottom:12}}>❌</p>
+      <p style={{fontSize:16,fontWeight:600,marginBottom:8}}>Generation failed</p>
+      <p style={{color:'var(--text-muted)',fontSize:13}}>{d.message || 'Make sure you have sources added.'}</p>
+    </div>
+  )
+
+  /* ═══ SLIDES — real presentation ═══ */
+  if (data.type === 'slides' && data.html) {
     return (
-      <div className="output-slides">
-        <div className="slide-card"><h2 className="slide-title">{s.title}</h2>{s.bullets?.map((b,i) => <p key={i} className="slide-bullet">• {b}</p>)}</div>
-        <div className="slide-nav">
-          <button onClick={() => setIdx(p=>Math.max(0,p-1))} disabled={idx===0}>←</button>
-          <span>{idx+1}/{slides.length}</span>
-          <button onClick={() => setIdx(p=>Math.min(slides.length-1,p+1))} disabled={idx>=slides.length-1}>→</button>
+      <div className="output-visual">
+        <iframe srcDoc={data.html} style={{width:'100%',height:'70vh',border:'none',borderRadius:'var(--radius)',background:'#0a0e1a'}} title="Presentation"/>
+        <div className="output-actions">
+          <button className="btn-export" onClick={() => {const b=new Blob([data.html],{type:'text/html'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='presentation.html';a.click()}}>
+            <Icon d={IC.download} size={14}/> Download HTML
+          </button>
         </div>
       </div>
     )
   }
-  if (data.type === 'mindmap') {
-    const tree = d.tree || d.data?.tree || d
+
+  /* ═══ MIND MAP — real visual tree ═══ */
+  if (data.type === 'mindmap' && data.html) {
     return (
-      <div className="output-mindmap">
-        <div className="mindmap-root"><p>{tree.label}</p></div>
-        <div className="mindmap-children">
-          {tree.children?.map((c,i) => (
-            <div key={i} className="mindmap-child">
-              <p className="child-title">{c.label}</p>
-              {c.children?.slice(0,3).map((l,j) => <p key={j} className="child-item">• {l.label}</p>)}
-            </div>
+      <div className="output-visual">
+        <iframe srcDoc={data.html} style={{width:'100%',height:'70vh',border:'none',borderRadius:'var(--radius)',background:'#06080f'}} title="Mind Map"/>
+        <div className="output-actions">
+          <button className="btn-export" onClick={() => {const b=new Blob([data.html],{type:'text/html'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='mindmap.html';a.click()}}>
+            <Icon d={IC.download} size={14}/> Download HTML
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  /* ═══ INFOGRAPHIC — real visual ═══ */
+  if (data.type === 'infographic' && data.html) {
+    return (
+      <div className="output-visual">
+        <iframe srcDoc={data.html} style={{width:'100%',height:'80vh',border:'none',borderRadius:'var(--radius)',background:'#06080f'}} title="Infographic"/>
+        <div className="output-actions">
+          <button className="btn-export" onClick={() => {const b=new Blob([data.html],{type:'text/html'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='infographic.html';a.click()}}>
+            <Icon d={IC.download} size={14}/> Download HTML
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  /* ═══ PODCAST — real playable audio ═══ */
+  if (data.type === 'podcast') {
+    const script = data.script || data.data || []
+    return <PodcastPlayer script={script}/>
+  }
+
+  /* ═══ VIDEO — slides + audio ═══ */
+  if (data.type === 'video') {
+    const slides = data.slides || data.data?.slides || []
+    const script = data.script || data.data?.script || []
+    return <VideoPlayer slides={slides} script={script}/>
+  }
+
+  /* ═══ FLASHCARDS — real flip cards ═══ */
+  if (data.type === 'flashcards') {
+    const cards = d.cards || d.data?.cards || []
+    return <FlashcardDeck cards={cards}/>
+  }
+
+  /* ═══ QUIZ — interactive quiz ═══ */
+  if (data.type === 'quiz') {
+    const qs = d.questions || d.data?.questions || []
+    return <QuizGame questions={qs}/>
+  }
+
+  /* ═══ SUMMARY — rich report ═══ */
+  if (data.type === 'summary') {
+    return (
+      <div className="output-report">
+        <div className="report-hero">
+          <h1>{d.title || 'Report'}</h1>
+          <div className="report-stats">
+            {d.wordCount && <div className="report-stat"><span className="stat-val">{d.wordCount.toLocaleString()}</span><span className="stat-label">Words</span></div>}
+            {d.keyPoints?.length && <div className="report-stat"><span className="stat-val">{d.keyPoints.length}</span><span className="stat-label">Key Points</span></div>}
+            {d.topics?.length && <div className="report-stat"><span className="stat-val">{d.topics.length}</span><span className="stat-label">Topics</span></div>}
+          </div>
+        </div>
+        {d.topics?.length > 0 && (
+          <div className="report-section">
+            <h2>Topics</h2>
+            <div className="topic-tags">{d.topics.map((t,i) => <span key={i} className="topic-tag">{t}</span>)}</div>
+          </div>
+        )}
+        {d.keyPoints?.length > 0 && (
+          <div className="report-section">
+            <h2>Key Findings</h2>
+            {d.keyPoints.map((p,i) => (
+              <div key={i} className="finding-card">
+                <span className="finding-num">{i+1}</span>
+                <p>{p}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {d.sections?.length > 0 && (
+          <div className="report-section">
+            <h2>Source Content</h2>
+            {d.sections.map((s,i) => (
+              <p key={i} className="source-excerpt">{s.slice(0,300)}{s.length>300?'...':''}</p>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  /* ═══ DATA TABLE — real table ═══ */
+  if (data.type === 'datatable') {
+    const headers = d.headers || []
+    const rows = d.rows || []
+    return (
+      <div className="output-table-wrap">
+        <table className="output-table">
+          <thead><tr>{headers.map((h,i) => <th key={i}>{h}</th>)}</tr></thead>
+          <tbody>{rows.map((r,i) => <tr key={i}>{r.map((c,j) => <td key={j}>{c}</td>)}</tr>)}</tbody>
+        </table>
+      </div>
+    )
+  }
+
+  return <pre className="output-raw" style={{padding:20,background:'var(--bg-card)',borderRadius:'var(--radius)',fontSize:12,maxHeight:400,overflow:'auto'}}>{JSON.stringify(d,null,2)}</pre>
+}
+
+/* ═══ PODCAST PLAYER — real TTS audio ═══ */
+function PodcastPlayer({ script }) {
+  const [playing, setPlaying] = useState(false)
+  const [currentIdx, setCurrentIdx] = useState(0)
+  const [progress, setProgress] = useState(0)
+  const [voices, setVoices] = useState([])
+  const [selectedVoice, setSelectedVoice] = useState(0)
+  const utterRef = useRef(null)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    const loadVoices = () => { const v = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en')); setVoices(v) }
+    loadVoices()
+    speechSynthesis.onvoiceschanged = loadVoices
+    return () => { speechSynthesis.cancel(); clearInterval(timerRef.current) }
+  }, [])
+
+  const playFrom = (idx) => {
+    speechSynthesis.cancel()
+    setCurrentIdx(idx); setPlaying(true)
+    const item = script[idx]
+    if (!item) { setPlaying(false); return }
+    const utter = new SpeechSynthesisUtterance(item.text)
+    utter.voice = voices[selectedVoice] || null
+    utter.rate = 0.95
+    utter.pitch = item.speaker === 'host' ? 1.0 : 0.85
+    utter.onend = () => {
+      if (idx < script.length - 1) {
+        setCurrentIdx(idx + 1)
+        setTimeout(() => playFrom(idx + 1), 300)
+      } else { setPlaying(false); setProgress(100) }
+    }
+    utter.onerror = () => { setPlaying(false) }
+    utterRef.current = utter
+    speechSynthesis.speak(utter)
+    setProgress(Math.round((idx / script.length) * 100))
+  }
+
+  const togglePlay = () => {
+    if (playing) { speechSynthesis.cancel(); setPlaying(false) }
+    else { playFrom(currentIdx) }
+  }
+
+  const stop = () => { speechSynthesis.cancel(); setPlaying(false); setCurrentIdx(0); setProgress(0) }
+
+  return (
+    <div className="podcast-player">
+      <div className="podcast-hero">
+        <div className="podcast-icon"><Icon d={IC.podcast} size={32} color="#8b5cf6"/></div>
+        <h2>Audio Overview</h2>
+        <p>{script.length} lines · {Math.round(script.reduce((a,s) => a + s.text.split(' ').length, 0) / 150)} min</p>
+      </div>
+      <div className="podcast-controls">
+        <button className="podcast-btn" onClick={stop}><Icon d={'M3 6h18M3 6v12a2 2 0 002 2h10a2 2 0 002-2V6'} size={18}/></button>
+        <button className="podcast-btn play" onClick={togglePlay}>{playing ? <Icon d={'M6 4h4v16H6zM14 4h4v16h-4z'} size={24}/> : <Icon d={'M5 3l14 9-14 9V3z'} size={24}/>}</button>
+        <div className="podcast-progress"><div className="progress-bar" style={{width:progress+'%'}}/></div>
+      </div>
+      {voices.length > 1 && (
+        <div className="voice-select">
+          <label>Voice:</label>
+          <select value={selectedVoice} onChange={e => setSelectedVoice(Number(e.target.value))}>
+            {voices.map((v,i) => <option key={i} value={i}>{v.name}</option>)}
+          </select>
+        </div>
+      )}
+      <div className="podcast-script">
+        {script.map((line, i) => (
+          <div key={i} className={`script-line ${i === currentIdx ? 'active' : ''} ${line.speaker}`} onClick={() => { speechSynthesis.cancel(); playFrom(i) }}>
+            <div className="speaker-badge">{line.speaker === 'host' ? '🎙️' : '🎤'} {line.speaker}</div>
+            <p>{line.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ═══ VIDEO PLAYER — slides + audio ═══ */
+function VideoPlayer({ slides, script }) {
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  const [voiceIdx, setVoiceIdx] = useState(0)
+  const [voices, setVoices] = useState([])
+  const linesPerSlide = Math.ceil(script.length / Math.max(slides.length, 1))
+  const currentScriptLines = script.slice(currentSlide * linesPerSlide, (currentSlide + 1) * linesPerSlide)
+  const s = slides[currentSlide]
+
+  useEffect(() => {
+    const v = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en')); setVoices(v)
+    speechSynthesis.onvoiceschanged = () => setVoices(speechSynthesis.getVoices().filter(v => v.lang.startsWith('en')))
+    return () => { speechSynthesis.cancel() }
+  }, [])
+
+  const playFromSlide = (idx) => {
+    speechSynthesis.cancel(); setCurrentSlide(idx); setPlaying(true)
+    const lines = script.slice(idx * linesPerSlide, (idx + 1) * linesPerSlide)
+    let i = 0
+    const speakNext = () => {
+      if (i >= lines.length || !playing) { if (idx < slides.length - 1) setTimeout(() => playFromSlide(idx + 1), 500); else setPlaying(false); return }
+      const utter = new SpeechSynthesisUtterance(lines[i].text)
+      utter.voice = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'))[voiceIdx] || null
+      utter.rate = 0.95
+      utter.onend = () => { i++; speakNext() }
+      speechSynthesis.speak(utter)
+    }
+    speakNext()
+  }
+
+  const togglePlay = () => {
+    if (playing) { speechSynthesis.cancel(); setPlaying(false) }
+    else playFromSlide(currentSlide)
+  }
+
+  if (!s) return null
+  return (
+    <div className="video-player">
+      <div className="video-screen" style={{borderTop:`4px solid ${s.accent || '#10b981'}`}}>
+        {s.type === 'title' ? (
+          <div className="video-title-slide">
+            <h1 style={{background:`linear-gradient(135deg,${s.accent},#fff)`,WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',fontSize:'2.5rem',fontWeight:800}}>{s.title}</h1>
+            <p style={{color:'#64748b',fontSize:'1.2rem',marginTop:12}}>{s.subtitle || ''}</p>
+          </div>
+        ) : (
+          <div className="video-content-slide">
+            <h2 style={{color:s.accent,fontSize:'1.6rem',fontWeight:700,marginBottom:20}}>{s.title}</h2>
+            {(s.bullets || s.items || []).map((b,i) => <p key={i} style={{fontSize:'1.1rem',color:'#94a3b8',lineHeight:2}}>• {b}</p>)}
+          </div>
+        )}
+      </div>
+      <div className="video-controls">
+        <button className="podcast-btn" onClick={() => {speechSynthesis.cancel();setPlaying(false);setCurrentSlide(p=>Math.max(0,p-1))}} disabled={currentSlide===0}>←</button>
+        <button className="podcast-btn play" onClick={togglePlay}>{playing ? <Icon d={'M6 4h4v16H6zM14 4h4v16h-4z'} size={20}/> : <Icon d={'M5 3l14 9-14 9V3z'} size={20}/>}</button>
+        <button className="podcast-btn" onClick={() => {speechSynthesis.cancel();setPlaying(false);setCurrentSlide(p=>Math.min(slides.length-1,p+1))}} disabled={currentSlide>=slides.length-1}>→</button>
+        <span style={{color:'var(--text-muted)',fontSize:12,marginLeft:8}}>{currentSlide+1}/{slides.length}</span>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ FLASHCARD DECK — real flip cards ═══ */
+function FlashcardDeck({ cards }) {
+  const [idx, setIdx] = useState(0)
+  const [flipped, setFlipped] = useState(false)
+  const [mastered, setMastered] = useState([])
+  const card = cards[idx]
+  if (!card) return <p style={{color:'var(--text-muted)',textAlign:'center',padding:40}}>No flashcards generated</p>
+  return (
+    <div className="flashcard-deck">
+      <div className="flashcard-progress-bar"><div className="fill" style={{width: ((idx+1)/cards.length*100)+'%'}}/></div>
+      <div className="flashcard-container" onClick={() => setFlipped(!flipped)}>
+        <div className={`flashcard-3d ${flipped ? 'flipped' : ''}`}>
+          <div className="flashcard-front">
+            <span className="card-label">QUESTION</span>
+            <p className="card-text">{card.q}</p>
+            <span className="card-hint">Click to reveal answer</span>
+          </div>
+          <div className="flashcard-back">
+            <span className="card-label">ANSWER</span>
+            <p className="card-text">{card.a}</p>
+          </div>
+        </div>
+      </div>
+      <div className="flashcard-nav">
+        <button onClick={() => {setIdx(p=>Math.max(0,p-1));setFlipped(false)}} disabled={idx===0}>← Previous</button>
+        <span>{idx+1} / {cards.length}</span>
+        <button onClick={() => {setIdx(p=>Math.min(cards.length-1,p+1));setFlipped(false)}} disabled={idx>=cards.length-1}>Next →</button>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ QUIZ GAME — interactive quiz ═══ */
+function QuizGame({ questions }) {
+  const [current, setCurrent] = useState(0)
+  const [answers, setAnswers] = useState({})
+  const [showResult, setShowResult] = useState(false)
+  const q = questions[current]
+  const answered = answers[current] !== undefined
+  const score = questions.filter((q,i) => answers[i] === q.answer).length
+
+  if (!q) return null
+  return (
+    <div className="quiz-game">
+      <div className="quiz-progress"><div className="fill" style={{width:((current+1)/questions.length*100)+'%'}}/></div>
+      <div className="quiz-card">
+        <p className="quiz-q-num">Question {current+1} of {questions.length}</p>
+        <p className="quiz-question-text">{q.question}</p>
+        <div className="quiz-options-grid">
+          {q.options?.map((o,j) => (
+            <button key={j} className={`quiz-option-btn ${answered ? (j===q.answer?'correct':(answers[current]===j?'wrong':'')) : ''}`} onClick={() => {if(!answered) setAnswers(p=>({...p,[current]:j}))}} disabled={answered}>
+              <span className="option-letter">{String.fromCharCode(65+j)}</span>
+              <span>{o}</span>
+            </button>
           ))}
         </div>
+        {answered && (
+          <button className="quiz-next" onClick={() => {if(current < questions.length-1) setCurrent(p=>p+1); else setShowResult(true)}}>
+            {current < questions.length-1 ? 'Next Question →' : 'See Results'}
+          </button>
+        )}
       </div>
-    )
-  }
-  if (data.type === 'flashcards') {
-    const cards = d.data?.cards || d.cards || []
-    const [idx, setIdx] = useState(0)
-    const [flipped, setFlipped] = useState(false)
-    const card = cards[idx]
-    if (!card) return null
-    return (
-      <div className="output-flashcards">
-        <div className="flashcard" onClick={() => setFlipped(!flipped)}><p>{flipped ? card.a : card.q}</p></div>
-        <p className="flashcard-hint">{idx+1}/{cards.length} · Click to flip</p>
-        <div className="flashcard-nav">
-          <button onClick={() => {setIdx(p=>Math.max(0,p-1));setFlipped(false)}} disabled={idx===0}>←</button>
-          <button onClick={() => setFlipped(!flipped)}>Flip</button>
-          <button onClick={() => {setIdx(p=>Math.min(cards.length-1,p+1));setFlipped(false)}} disabled={idx>=cards.length-1}>→</button>
+      {showResult && (
+        <div className="quiz-result">
+          <div className="score-circle">
+            <span className="score-num">{score}/{questions.length}</span>
+            <span className="score-pct">{Math.round(score/questions.length*100)}%</span>
+          </div>
+          <p className="score-label">{score === questions.length ? 'Perfect!' : score >= questions.length/2 ? 'Good job!' : 'Keep studying!'}</p>
+          <button className="quiz-retry" onClick={() => {setAnswers({});setCurrent(0);setShowResult(false)}}>Try Again</button>
         </div>
-      </div>
-    )
-  }
-  if (data.type === 'quiz') {
-    const qs = d.data?.questions || d.questions || []
-    return <div className="output-quiz">{qs.map((q,i) => (
-      <div key={i} className="quiz-question"><p className="quiz-q">{i+1}. {q.question}</p>
-        <div className="quiz-options">{q.options?.map((o,j) => <div key={j} className={`quiz-option ${j===q.answer?'correct':''}`}>{o}</div>)}</div>
-      </div>
-    ))}</div>
-  }
-  if (data.type === 'summary') {
-    return <div className="output-summary"><h3>{d.title||'Summary'}</h3>{d.keyPoints?.map((p,i) => <p key={i} className="summary-point">• {p}</p>)}{d.topics?.length > 0 && <div className="summary-topics">{d.topics.map((t,i) => <span key={i} className="topic-tag">{t}</span>)}</div>}</div>
-  }
-  return <pre className="output-raw">{JSON.stringify(d,null,2)}</pre>
+      )}
+    </div>
+  )
 }
 
 /* ═══ MAIN APP ═══ */
