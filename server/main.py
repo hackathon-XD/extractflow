@@ -490,9 +490,20 @@ def smart_extract(text, query, src_count=1):
             if len(words) < 4: continue
             # Skip sentences that are mostly list/HTML fragments
             if s.count(',') > 5 and len(s.split(',')) > len(s.split('.')): continue
-            # Skip wiki-style navigation lists
+            # Skip junk patterns
             if re.match(r'^[A-Z][a-z]+\s*$', s): continue
             if re.match(r'^[A-Z][a-z]+(\s+[A-Z][a-z]+)+\s*$', s) and len(s) < 60: continue
+            if s.lower().startswith(('read more','view deal','check our','follow us','subscribe','click here','sign up','learn more','shop now','buy now','get started','try free','download now','watch now','listen now','see more','show more','load more','explore more')): continue
+            if re.match(r'^(?:View|Read|Check|Follow|Shop|Buy|Subscribe|Click|Sign|Learn|Download|Watch|Listen|See|Show|Load|Explore|Discover|Subscribe)\b', s): continue
+            # Remove metadata suffixes
+            s = re.sub(r'\s*Published:\s*[\d\-/]+\s*\.?\s*$', '', s).strip()
+            s = re.sub(r'\s*Published:\s*\w+\s+\d{1,2},\s*\d{4}\s*\.?\s*$', '', s).strip()
+            # Skip Wikipedia navigation
+            if any(x in s.lower() for x in ['jump to content','from wikipedia','coordinates','wikipedia','wiki','free encyclopedia','jump to','navigation','search']): continue
+            # Skip news site navigation
+            if re.match(r'^[A-Z][a-z]+\s*\|\s*(Latest|News|Home|Menu)', s): continue
+            if any(x in s.lower() for x in ['jump to content','coordinates','free encyclopedia','view source','view history']): continue
+            if len(s) < 30: continue
             if s[-1] not in '.!?': s += '.'
             sentences.append(s)
     if not sentences:
@@ -551,7 +562,7 @@ def smart_extract(text, query, src_count=1):
             top.append(s)
         if len(top) >= (10 if is_summary or is_list else 6): break
     # Step 5: Build clean topic list
-    TOPIC_STOP = JUNK | {'about','their','there','these','those','which','would','could','should','being','where','after','before','between','during','through','however','moreover','furthermore','including','according','specific','different','particularly','significant','substantial','approximately','established','because','while','since','although','unless','within','without','already','also','just','only','even','still','much','many','some','than','them','then','that','this','have','been','from','with','each','will','into','very','what','when','how','who','its','are','was','for','not','but','can','may','one','two','get','got','say','said','use','used','new','old','like','make','made','well','back','over','come','take','look','own','same','tell','know','see','want','give','first','last','long','great','little','right','high','left','large','next','early','young','few','public','bad','able','file','user','admin','server','client','window','document','element','event','function','return','import','export','default','class','extends','super','constructor','method','property','prototype','module','require','package','namespace','interface','abstract','implements','public','private','protected','static','final','void','null','undefined','boolean','string','number','array','object','symbol','bigint','function','async','await','yield','generator','iterator','proxy','reflect','map','weakmap','set','weakset','promise','date','regexp','error','math','json','console','global','buffer','process','stream','channel','socket','http','https','ftp','ssh','dns','tcp','udp','ip','url','uri','urn','api','rest','soap','graphql','grpc','websocket','socket','cors','csrf','xss','sql','nosql','redis','memcache','elasticsearch','kafka','rabbitmq','celery','nginx','apache','docker','kubernetes','terraform','ansible','jenkins','github','gitlab','bitbucket','jira','confluence','slack','discord','teams','zoom','skype','google','microsoft','amazon','azure','cloud','aws','gcp','lambda','s3','ec2','rds','dynamo','sqs','sns','cloudwatch','iam','vpc','cdn','dns','ssl','tls','cert','key','token','session','cookie','header','body','status','code','response','request','method','route','endpoint','handler','middleware','controller','service','repository','model','schema','migration','seed','fixture','factory','test','spec','mock','stub','spy','assert','expect','describe','it','before','after','each','all','suite','runner','report','coverage','lint','format','build','bundle','compile','transpile','minify','uglify','tree','shake','hot','reload','live','module','chunk','asset','resource','source','target','input','output','stream','pipe','transform','filter','map','reduce','flat','sort','reverse','splice','slice','concat','join','split','trim','pad','repeat','replace','match','search','indexOf','last','includes','startsWith','endsWith','every','some','find','findIndex','keys','values','entries','from','assign','freeze','seal','create','define','property','descriptor','enumerable','configurable','writable','value','get','set','has','delete','own','keys','prevent','extensions','is','frozen','sealed','extensible','prototype','constructor','toString','valueOf','toLocale','string','number','boolean','symbol','bigint'}
+    TOPIC_STOP = JUNK | {'about','their','there','these','those','which','would','could','should','being','where','after','before','between','during','through','however','moreover','furthermore','including','according','specific','different','particularly','significant','substantial','approximately','established','because','while','since','although','unless','within','without','already','also','just','only','even','still','much','many','some','than','them','then','that','this','have','been','from','with','each','will','into','very','what','when','how','who','its','are','was','for','not','but','can','may','one','two','get','got','say','said','use','used','new','old','like','make','made','well','back','over','come','take','look','own','same','tell','know','see','want','give','first','last','long','great','little','right','high','left','large','next','early','young','few','public','bad','able','file','user','admin','server','client','window','document','element','event','function','return','import','export','default','class','extends','super','constructor','method','property','prototype','module','require','package','wikipedia','sexual','source','published','check','follow','news','read','more','deal','latest','view','published','said','told','according','report','reportedly','alleged','allegedly','attorney','lawyer','court','judge','jury','trial','case','filed','lawsuit','lawsuits','allegations','allegations','charges','convicted','sentenced','released','transferred','assigned','facility','prison','jail','inmate','inmates','chaplain','reading','needs','comforting','rewarding','help','mogul','rapper','singer','artist','musician','producer','album','singles','chart','billboard','number','label','record','studio','film','starred','television','reality','series','defend','criminal','paid','million','billion','wealthy'}
     word_freq = {}
     for w in re.split(r'\W+', text.lower()):
         if len(w) > 4 and w not in TOPIC_STOP:
@@ -586,7 +597,9 @@ def smart_extract(text, query, src_count=1):
         return response.strip()
     response += '**Findings:**\n\n'
     for i, s in enumerate(top[:8 if is_summary else 5], 1):
-        clean = s[:280] + ('...' if len(s) > 280 else '')
+        clean = re.sub(r'\[\d+\]', '', s).strip()
+        clean = re.sub(r'\s+', ' ', clean)
+        if len(clean) > 280: clean = clean[:277] + '...'
         # Bold statistics
         clean = re.sub(r'(?<!\d)(\d+[\.,]?\d*\s*(?:%|billion|million|trillion|GW|GWh|kWh|percent|USD|dollars))', r'**\1**', clean, flags=re.I)
         response += f'{i}. {clean}\n\n'
