@@ -104,6 +104,31 @@ function Particles() {
   )
 }
 
+/* ═══ CUSTOM EXTRACTFLOW LOGO ═══ */
+const ExtractFlowLogo = ({ size = 40, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <path d="M32 2L58 17V47L32 62L6 47V17L32 2Z" fill="url(#logoGrad2)" stroke="rgba(16,185,129,0.4)" strokeWidth="1.5"/>
+    <path d="M32 10L50 21V43L32 54L14 43V21L32 10Z" fill="rgba(6,8,15,0.8)" stroke="rgba(16,185,129,0.2)" strokeWidth="1"/>
+    <path d="M36 18L24 34H32L28 46L40 30H32L36 18Z" fill="url(#boltGrad2)" stroke="rgba(16,185,129,0.6)" strokeWidth="0.5"/>
+    <circle cx="20" cy="28" r="2" fill="#10b981" opacity="0.6"/>
+    <circle cx="44" cy="36" r="2" fill="#6366f1" opacity="0.6"/>
+    <circle cx="22" cy="42" r="1.5" fill="#10b981" opacity="0.4"/>
+    <circle cx="42" cy="24" r="1.5" fill="#6366f1" opacity="0.4"/>
+    <line x1="20" y1="28" x2="32" y2="32" stroke="#10b981" strokeWidth="0.5" opacity="0.3"/>
+    <line x1="44" y1="36" x2="32" y2="32" stroke="#6366f1" strokeWidth="0.5" opacity="0.3"/>
+    <defs>
+      <linearGradient id="logoGrad2" x1="6" y1="2" x2="58" y2="62">
+        <stop offset="0%" stopColor="rgba(16,185,129,0.15)"/>
+        <stop offset="100%" stopColor="rgba(99,102,241,0.1)"/>
+      </linearGradient>
+      <linearGradient id="boltGrad2" x1="24" y1="18" x2="40" y2="46">
+        <stop offset="0%" stopColor="#10b981"/>
+        <stop offset="100%" stopColor="#34d399"/>
+      </linearGradient>
+    </defs>
+  </svg>
+)
+
 /* ═══ Icons ═══ */
 const I = {
   Zap: (p: any) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
@@ -203,9 +228,7 @@ export default function App() {
         style={{ padding: '14px 32px', borderBottom: scrolled ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.05))', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <I.Sparkles style={{ width: 18, height: 18, color: '#10b981' }} />
-            </div>
+            <ExtractFlowLogo size={38} />
             <span className="text-gradient" style={{ fontSize: 17, fontWeight: 800 }}>ExtractFlow</span>
           </div>
           <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
@@ -471,8 +494,8 @@ export default function App() {
       <section id="download" style={{ padding: '100px 24px', position: 'relative', zIndex: 10 }}>
         <div ref={ctaRef} className="reveal" style={{ maxWidth: 800, margin: '0 auto', textAlign: 'center' }}>
           <div className="glass-card gradient-border" style={{ padding: '64px 48px' }}>
-            <div style={{ width: 64, height: 64, borderRadius: 16, background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.05))', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-              <I.Sparkles style={{ width: 32, height: 32, color: '#10b981' }} />
+            <div style={{ margin: '0 auto 24px', display: 'flex', justifyContent: 'center' }}>
+              <ExtractFlowLogo size={64} />
             </div>
             <h2 style={{ fontSize: '2.8rem', fontWeight: 900, marginBottom: 16, letterSpacing: '-0.02em' }}>
               Start building with <span className="text-gradient">your own AI</span>
@@ -520,7 +543,7 @@ export default function App() {
       <footer style={{ borderTop: '1px solid rgba(255,255,255,0.04)', padding: '32px 24px', position: 'relative', zIndex: 10 }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <I.Sparkles style={{ width: 18, height: 18, color: 'var(--accent)' }} />
+            <ExtractFlowLogo size={18} />
             <span style={{ fontSize: 14, fontWeight: 700 }}>ExtractFlow AI</span>
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>© 2025 github.com/al13n-x-v0x · Discord: al13n._.invisible</span>
           </div>

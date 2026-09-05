@@ -15,9 +15,37 @@ if (typeof window !== 'undefined') {
     if (e.ctrlKey && e.key === 'c' && !window.getSelection()?.toString()) e.preventDefault()
     if (e.ctrlKey && e.key === 'x') e.preventDefault()
   })
-  // Disable drag on images
-  document.addEventListener('dragstart', e => { if (e.target?.tagName === 'IMG') e.preventDefault() })
 }
+
+/* ═══ CUSTOM EXTRACTFLOW LOGO ═══ */
+const ExtractFlowLogo = ({ size = 40, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    {/* Outer hexagon frame */}
+    <path d="M32 2L58 17V47L32 62L6 47V17L32 2Z" fill="url(#logoGrad)" stroke="rgba(16,185,129,0.4)" strokeWidth="1.5"/>
+    {/* Inner hexagon */}
+    <path d="M32 10L50 21V43L32 54L14 43V21L32 10Z" fill="rgba(6,8,15,0.8)" stroke="rgba(16,185,129,0.2)" strokeWidth="1"/>
+    {/* Lightning bolt - the "Extract" */}
+    <path d="M36 18L24 34H32L28 46L40 30H32L36 18Z" fill="url(#boltGrad)" stroke="rgba(16,185,129,0.6)" strokeWidth="0.5"/>
+    {/* Data flow dots */}
+    <circle cx="20" cy="28" r="2" fill="#10b981" opacity="0.6"/>
+    <circle cx="44" cy="36" r="2" fill="#6366f1" opacity="0.6"/>
+    <circle cx="22" cy="42" r="1.5" fill="#10b981" opacity="0.4"/>
+    <circle cx="42" cy="24" r="1.5" fill="#6366f1" opacity="0.4"/>
+    {/* Connection lines */}
+    <line x1="20" y1="28" x2="32" y2="32" stroke="#10b981" strokeWidth="0.5" opacity="0.3"/>
+    <line x1="44" y1="36" x2="32" y2="32" stroke="#6366f1" strokeWidth="0.5" opacity="0.3"/>
+    <defs>
+      <linearGradient id="logoGrad" x1="6" y1="2" x2="58" y2="62">
+        <stop offset="0%" stopColor="rgba(16,185,129,0.15)"/>
+        <stop offset="100%" stopColor="rgba(99,102,241,0.1)"/>
+      </linearGradient>
+      <linearGradient id="boltGrad" x1="24" y1="18" x2="40" y2="46">
+        <stop offset="0%" stopColor="#10b981"/>
+        <stop offset="100%" stopColor="#34d399"/>
+      </linearGradient>
+    </defs>
+  </svg>
+)
 
 /* ═══ SVG ICONS ═══ */
 const I = {
@@ -378,7 +406,7 @@ export default function App() {
       <aside className="glass w-72 xl:w-80 flex-shrink-0 border-r border-white/[0.06] flex flex-col overflow-hidden">
         <div className="p-4 border-b border-white/[0.06]">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 flex items-center justify-center shadow-lg shadow-emerald-500/10 animate-glow"><I.Sparkles className="w-5 h-5 text-emerald-400" /></div>
+            <ExtractFlowLogo size={40} className="drop-shadow-lg" />
             <div className="flex-1">
               <h1 className="text-[15px] font-extrabold tracking-tight text-gradient">ExtractFlow</h1>
               <p className="text-[7px] font-bold uppercase tracking-[0.15em] text-slate-600">by al13n-x-v0x</p>
