@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Terms & Privacy — ExtractFlow AI</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+    :root { --bg:#06080f; --text:#e8edf5; --dim:#94a3b8; --accent:#10b981; }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:80px 24px}
+    .container{max-width:800px;margin:0 auto}
+    h1{font-size:2.5rem;font-weight:900;margin-bottom:8px}
+    .date{color:var(--dim);font-size:0.85rem;margin-bottom:40px}
+    h2{font-size:1.3rem;font-weight:800;margin:32px 0 12px;color:var(--accent)}
+    p{color:var(--dim);font-size:0.9rem;margin-bottom:16px}
+    ul{color:var(--dim);font-size:0.9rem;margin:0 0 16px 20px}
+    li{margin-bottom:8px}
+    a{color:var(--accent);text-decoration:none}
+    .back{display:inline-flex;align-items:center;gap:8px;color:var(--dim);font-size:0.85rem;margin-bottom:32px;text-decoration:none;transition:color 0.2s}
+    .back:hover{color:var(--accent)}
+    hr{border:none;border-top:1px solid rgba(255,255,255,0.06);margin:48px 0}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a class="back" href="index.html">← Back to ExtractFlow AI</a>
+    <h1>Terms & Privacy</h1>
+    <p class="date">Last updated: September 5, 2025</p>
+
+    <h2 id="terms">Terms of Service</h2>
+    <p>ExtractFlow AI is an open-source software project distributed under the MIT License. By using this software, you agree to the following terms:</p>
+
+    <h3>1. License Grant</h3>
+    <p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software.</p>
+
+    <h3>2. No Warranty</h3>
+    <p>The Software is provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose and noninfringement. In no event shall the authors or copyright holders be liable for any claim, damages or other liability.</p>
+
+    <h3>3. AI Model Usage</h3>
+    <p>ExtractFlow AI can download and run AI models from HuggingFace. These models are subject to their own licenses:</p>
+    <ul>
+      <li>Local models run entirely on your machine — no data is sent externally</li>
+      <li>Cloud API usage (Gemini, OpenAI, etc.) is subject to each provider's terms</li>
+      <li>You are responsible for compliance with any API terms of service you connect</li>
+    </ul>
+
+    <h3>4. User Responsibility</h3>
+    <p>You are responsible for:</p>
+    <ul>
+      <li>The content you upload and process through ExtractFlow</li>
+      <li>Ensuring your use complies with applicable laws</li>
+      <li>Any data you choose to share with cloud API providers</li>
+    </ul>
+
+    <hr/>
+
+    <h2 id="privacy">Privacy Policy</h2>
+    <p><strong>ExtractFlow AI is designed for maximum privacy.</strong> Here's exactly how your data is handled:</p>
+
+    <h3>Data Processing</h3>
+    <ul>
+      <li><strong>100% Local Processing:</strong> All AI inference runs on your machine. Your documents are never sent to any server unless you explicitly configure a cloud API.</li>
+      <li><strong>No Telemetry:</strong> ExtractFlow does not collect any usage data, analytics, or telemetry. Zero.</li>
+      <li><strong>No Accounts Required:</strong> No registration, no login, no email collection. The optional login feature stores credentials locally in SQLite on your machine only.</li>
+      <li><strong>Local Storage Only:</strong> All documents, chat history, and settings are stored in a local SQLite database on your computer. Nothing is uploaded anywhere.</li>
+    </ul>
+
+    <h3>Cloud API Usage</h3>
+    <p>If you choose to connect a cloud API (Gemini, OpenAI, etc.):</p>
+    <ul>
+      <li>Your API key is stored locally in your SQLite database</li>
+      <li>When you chat, your message and document context are sent to the cloud provider you configured</li>
+      <li>This is entirely voluntary — the app works fully offline without any cloud connection</li>
+      <li>You should review the privacy policy of each cloud provider you connect</li>
+    </ul>
+
+    <h3>Open Source Transparency</h3>
+    <p>The entire codebase is open source on <a href="https://github.com/hackathon-XD/extractflow">GitHub</a>. You can audit every line of code to verify these claims.</p>
+
+    <h3>Data Retention</h3>
+    <p>All data is stored locally on your machine. You can delete any document, chat history, or configuration at any time. Uninstalling the application removes all local data.</p>
+
+    <h3>Children's Privacy</h3>
+    <p>ExtractFlow is not directed at children under 13. Since it runs entirely locally with no data collection, there are no privacy concerns for any age group.</p>
+
+    <hr/>
+
+    <h2>Contact</h2>
+    <p>For questions about these terms, open an issue on <a href="https://github.com/hackathon-XD/extractflow/issues">GitHub Issues</a>.</p>
+  </div>
+</body>
+</html>

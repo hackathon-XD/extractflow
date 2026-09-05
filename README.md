@@ -1,111 +1,115 @@
-# ExtractFlow AI
+# ⚡ ExtractFlow AI
 
-> **NotebookLM killer** — upload documents, chat with AI, generate slide decks, infographics, and podcasts. All local. Your data never leaves your machine.
+**Your documents. Your AI. No compromises.**
 
-![React](https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black)
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
-![llama.cpp](https://img.shields.io/badge/llama.cpp-FF6B35?style=flat&logo=cplusplus&logoColor=white)
-![Privacy](https://img.shields.io/badge/100%25-Local-green?style=flat)
-
----
-
-## Why ExtractFlow?
-
-| Feature | NotebookLM | ExtractFlow |
-|---------|-----------|-------------|
-| Local / Private | ❌ Google Cloud | ✅ 100% local |
-| Slide Generation | ✅ | ✅ HTML export |
-| Infographic Generation | ❌ | ✅ Data viz + export |
-| Podcast Generation | ✅ | ✅ TTS with speakers |
-| Model Library | ❌ Locked | ✅ 40+ GGUF models |
-| Open Source | ❌ | ✅ MIT License |
-| API Keys Required | ✅ Google | ❌ None |
-
----
+100% local AI document intelligence. Upload files, chat with AI, generate slide decks, podcasts, mind maps, flashcards, and structured data extractions. Everything runs on your machine.
 
 ## Features
 
-### Chat with Documents
-- Upload TXT, CSV, JSON, MD files
-- Smart keyword-RAG retrieval
-- Ask questions, get answers from your docs
-- Voice input (STT) + voice output (TTS)
+- 🗣️ **AI Chat** — Ask questions about your documents, get precise answers
+- 📊 **Slide Decks** — Auto-generate presentations from any document
+- 🎙️ **Podcast** — Turn documents into two-speaker audio conversations
+- 🧠 **Mind Maps** — Visualize document structure with interactive trees
+- 📚 **Flashcards** — Auto-generate study materials
+- ⚡ **Data Extraction** — Pull structured JSON from unstructured text
+- ☁️ **Cloud AI** — Connect Gemini, OpenAI, Claude, Groq, DeepSeek + 5 more
+- 🤖 **Ensemble Mode** — Multiple models work together as a team
+- 📚 **Knowledge Base** — Persistent offline document storage
+- 🔐 **Login System** — User accounts with session memory
+- 🎨 **3 Modes** — Normal (simple), Dev (power user), Demo (presentation)
+- 🔒 **100% Private** — No data leaves your computer
 
-### Generate Slide Decks
-- AI-powered presentation builder
-- Title slide, content slides, summary slide
-- Export as standalone HTML
-- Keyboard navigation (← →)
+## Model Library (50+ models)
 
-### Generate Infographics
-- Auto-extract key statistics and topics
-- Visual data cards with color-coded sections
-- Key numbers highlight
-- Export as standalone HTML
-
-### Generate Podcasts
-- Two-speaker conversation script
-- Host + Co-host alternating dialogue
-- Play with browser TTS (Web Speech API)
-- Click any segment to start from there
-
-### Model Library (40+ Models)
-SmolLM, Qwen, Phi, Llama, Gemma, Mistral, DeepSeek, Yi, StableLM, OpenHermes, SOLAR, Command R, CodeLlama, WizardLM, Starling, MiniCPM, InternLM, Nemotron — every major GGUF model from HuggingFace.
-
----
+| Type | Models |
+|------|--------|
+| Text Generation | Qwen3, Llama 3, Phi-4, Gemma 3, Mistral, DeepSeek, Yi, CodeLlama... |
+| Embeddings | MiniLM, BGE, E5, Nomic, Stella |
+| Translation | NLLB-200, OPUS (10 language pairs) |
+| Speech | Whisper Tiny → Large, Wav2Vec2 |
+| Vision | MobileNet, ViT, DeiT, SAM, DETR |
+| Classification | DistilBERT, BART, RoBERTa |
 
 ## Quick Start
 
-### Windows
+### Windows (One Click)
 ```
 Double-click start.bat
 ```
 
 ### Manual
 ```bash
-# Backend
-python -m venv venv && source venv/bin/activate
+# Install Python deps
 pip install -r requirements.txt
-python server/main.py
 
-# Frontend
+# Install frontend
 cd frontend && npm install && npm run dev
+
+# Build marketing website
+cd website && npm install && npm run build
+
+# Start server
+python server/main.py
 ```
 
-Open **http://localhost:3000**
+Open **http://localhost:4000**
 
----
-
-## Architecture
+## Project Structure
 
 ```
-React + Vite (3000)  ←→  FastAPI (4000)  ←→  llama.cpp (Local LLM)
-         │                       │
-    WebSocket              HuggingFace Hub
-    (progress)            (model downloads)
+extractflow-ai/
+├── server/main.py          # Python FastAPI backend (1000+ lines)
+├── frontend/               # React + Vite app
+│   └── src/App.jsx         # Main app with 10 tabs
+├── website/                # Marketing website (React + TypeScript)
+│   ├── src/App.tsx         # Landing page with motion graphics
+│   └── terms.html          # Terms & Privacy
+├── models/                 # Downloaded GGUF models
+├── data/                   # SQLite database (offline)
+├── output/                 # Exported files
+├── build_exe.py            # EXE builder (PyInstaller)
+├── start.bat               # One-click launcher
+└── requirements.txt        # Python dependencies
 ```
 
----
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/register` | POST | Create account |
+| `/api/auth/login` | POST | Login |
+| `/api/chat` | POST | Chat with local LLM |
+| `/api/cloud/chat` | POST | Chat via cloud API |
+| `/api/ensemble/chat` | POST | Multi-model ensemble chat |
+| `/api/models` | GET | List all models |
+| `/api/models/{id}/download` | POST | Download model |
+| `/api/models/{id}/load` | POST | Load model |
+| `/api/upload` | POST | Upload document |
+| `/api/generate/slides` | POST | Generate slides |
+| `/api/generate/podcast` | POST | Generate podcast |
+| `/api/generate/infographic` | POST | Generate infographic |
+| `/api/generate/mindmap` | POST | Generate mind map |
+| `/api/templates` | GET | List prompt templates |
+| `/api/sessions` | GET | List chat sessions |
+| `/api/knowledge` | GET | Knowledge base |
+| `/api/analytics` | GET | Usage analytics |
+| `/api/settings` | GET/POST | User settings |
+| `/site` | GET | Marketing website |
 
 ## Tech Stack
 
-| Layer | Tech |
-|-------|------|
-| Frontend | React 18, Vite, Tailwind CSS v4 |
-| Backend | Python 3.12, FastAPI, Uvicorn |
-| AI | llama-cpp-python (GGUF models) |
-| Downloads | HuggingFace Hub |
-| Voice | Web Speech API (TTS/STT) |
-| Realtime | WebSocket |
+- **Backend:** Python, FastAPI, llama-cpp-python, SQLite
+- **Frontend:** React, Vite, Tailwind CSS
+- **Website:** React, TypeScript, Vite, CSS Motion Graphics
+- **AI:** llama.cpp (local), 10 cloud API providers
+- **License:** MIT
+
+## Links
+
+- [GitHub](https://github.com/hackathon-XD/extractflow)
+- [Terms](http://localhost:4000/terms)
+- [Website](http://localhost:4000/site)
 
 ---
 
-## Built for Hackathon XD
-
-ExtractFlow AI proves that powerful AI tools don't need cloud infrastructure. Run NotebookLM-level features entirely on your own hardware.
-
----
-
-## License
-
-MIT
+Built with ⚡ by [hackathon-XD](https://github.com/hackathon-XD)
