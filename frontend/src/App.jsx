@@ -1092,22 +1092,150 @@ function QuizGame({ questions }) {
   )
 }
 
+/* ═══ STARTUP BANNER — auto-checks & auto-downloads models ═══ */
+function StartupBanner() {
+  const [status, setStatus] = useState(null)
+  const [dlProgress, setDlProgress] = useState(0)
+  const [dlModel, setDlModel] = useState('')
+  const [dismissed, setDismissed] = useState(false)
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    // Check startup status
+    fetch(`${API}/startup`).then(r=>r.json()).then(d => {
+      setStatus(d); setChecking(false)
+      if (d.needs_model) {
+        // Auto-download the smallest powerful model
+        fetch(`${API}/startup/auto-download`, {method:'POST'}).then(r=>r.json()).then(dl => {
+          if (dl.status === 'downloading') {
+            setDlModel(dl.name || dl.model)
+            setDlProgress(0)
+          }
+        })
+      }
+    }).catch(() => setChecking(false))
+    // Poll download progress
+    const iv = setInterval(() => {
+      fetch(`${API}/startup`).then(r=>r.json()).then(d => {
+        setStatus(d)
+        const dl = d.downloads || {}
+        const keys = Object.keys(dl)
+        if (keys.length > 0) {
+          const k = keys[0]
+          setDlProgress(dl[k].percent || 0)
+          setDlModel(k)
+          if (dl[k].status === 'done') {
+            setTimeout(() => setDismissed(true), 2000)
+          }
+        } else if (d.models_installed > 0) {
+          setTimeout(() => setDismissed(true), 1500)
+        }
+      })
+    }, 2000)
+    return () => clearInterval(iv)
+  }, [])
+
+  if (dismissed || !status || (status.models_installed > 0 && !status.auto_downloading)) return null
+
+  const foundCount = status?.gguf_found?.length || 0
+  const installedCount = status?.models_installed || 0
+  const isDownloading = dlProgress > 0 && dlProgress < 100
+
+  return (
+    <div className="startup-overlay" onClick={() => installedCount > 0 && setDismissed(true)}>
+      <div className="startup-card" onClick={e => e.stopPropagation()}>
+        <div className="startup-logo"><Logo size={48}/></div>
+        <h2 className="startup-title">ExtractFlow AI</h2>
+        <p className="startup-sub">Setting up your local AI engine...</p>
+
+        {checking && (
+          <div className="startup-status">
+            <div className="startup-spinner"/>
+            <p>Scanning for local models...</p>
+          </div>
+        )}
+
+        {!checking && !isDownloading && installedCount === 0 && foundCount === 0 && (
+          <div className="startup-status">
+            <div className="startup-icon warn">⚠️</div>
+            <p className="startup-msg">No local AI models found</p>
+            <p className="startup-hint">Auto-downloading the best lightweight model for you</p>
+            <button className="btn-startup-action" onClick={() => {
+              fetch(`${API}/startup/auto-download`, {method:'POST'}).then(r=>r.json()).then(dl => {
+                if (dl.name) setDlModel(dl.name)
+              })
+            }}>Download Now</button>
+          </div>
+        )}
+
+        {!checking && isDownloading && (
+          <div className="startup-status">
+            <div className="startup-dl-info">
+              <p className="dl-model-name">Downloading {dlModel}</p>
+              <p className="dl-size">~950MB · Cached after first run</p>
+            </div>
+            <div className="startup-progress">
+              <div className="startup-progress-bar" style={{width:dlProgress+'%'}}/>
+            </div>
+            <p className="dl-percent">{dlProgress}%</p>
+            <p className="dl-hint">You can start using the app while it downloads in the background</p>
+            <button className="btn-startup-dismiss" onClick={() => setDismissed(true)}>Continue to App →</button>
+          </div>
+        )}
+
+        {!checking && !isDownloading && foundCount > 0 && (
+          <div className="startup-status">
+            <div className="startup-icon ok">✅</div>
+            <p className="startup-msg">Found {foundCount} GGUF model{foundCount>1?'s':''} on your system</p>
+            {status.gguf_found.slice(0,3).map((f,i) => (
+              <div key={i} className="found-model-item">
+                <span className="fm-name">{f.name}</span>
+                <span className="fm-size">{f.size_mb} MB</span>
+                {f.matched && <span className="fm-badge">Auto-detected</span>}
+              </div>
+            ))}
+            <button className="btn-startup-action" onClick={() => setDismissed(true)}>Start Using →</button>
+          </div>
+        )}
+
+        {!checking && !isDownloading && installedCount > 0 && (
+          <div className="startup-status">
+            <div className="startup-icon ok">✅</div>
+            <p className="startup-msg">{installedCount} model{installedCount>1?'s':''} ready</p>
+            <button className="btn-startup-action" onClick={() => setDismissed(true)}>Start Using →</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ═══ MAIN APP ═══ */
 export default function App() {
   const [notebooks, setNotebooks] = useState([])
   const [selected, setSelected] = useState(null)
+  const [ready, setReady] = useState(false)
 
   const refresh = useCallback(async () => {
     try { const r = await fetch(`${API}/notebooks`); if (r.ok) setNotebooks(await r.json()) } catch (e) {}
   }, [])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => { refresh(); setTimeout(() => setReady(true), 500) }, [refresh])
 
   const deleteNotebook = useCallback(async id => {
     await fetch(`${API}/notebooks/${id}`, { method: 'DELETE' }); if (selected === id) setSelected(null); refresh()
   }, [selected, refresh])
 
   const currentNotebook = notebooks.find(n => n.id === selected)
-  if (selected && currentNotebook) return <NotebookView notebook={currentNotebook} onBack={() => setSelected(null)} refresh={refresh}/>
-  return <HomePage notebooks={notebooks} onSelect={setSelected} onDelete={deleteNotebook} refresh={refresh}/>
+
+  return (
+    <Fragment>
+      <StartupBanner />
+      {selected && currentNotebook ? (
+        <NotebookView notebook={currentNotebook} onBack={() => setSelected(null)} refresh={refresh}/>
+      ) : (
+        <HomePage notebooks={notebooks} onSelect={setSelected} onDelete={deleteNotebook} refresh={refresh}/>
+      )}
+    </Fragment>
+  )
 }
