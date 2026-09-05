@@ -439,10 +439,51 @@ def health(): return {"status": "ok", "model": loaded_model, "docs": len(documen
 
 
 # ═══════════════════════════════════════════════════════════
-# STATIC WEBSITE — Serve marketing site
+# STATIC WEBSITE — Serve frontend app + marketing site
 # ═══════════════════════════════════════════════════════════
 from fastapi.responses import HTMLResponse
+from starlette.staticfiles import StaticFiles
+FRONTEND_DIR = BASE_DIR / "frontend" / "dist"
 SITE_DIR = BASE_DIR / "website" / "dist"
+
+# Serve frontend app at root
+@app.get("/app", response_class=HTMLResponse)
+@app.get("/app/", response_class=HTMLResponse)
+def serve_app():
+    index = FRONTEND_DIR / "index.html"
+    if index.exists(): return HTMLResponse(index.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>Frontend not built. Run: cd frontend && npm run build</h1>")
+
+@app.get("/app/{path:path}")
+def serve_app_file(path: str):
+    f = FRONTEND_DIR / path
+    if f.exists() and f.is_file():
+        import mimetypes
+        ct = mimetypes.guess_type(str(f))[0] or "application/octet-stream"
+        return FileResponse(str(f), media_type=ct)
+    index = FRONTEND_DIR / "index.html"
+    if index.exists(): return HTMLResponse(index.read_text(encoding="utf-8"))
+    raise HTTPException(404)
+
+# Serve frontend at root / (so localhost:4000 shows the app)
+@app.get("/", response_class=HTMLResponse)
+def serve_root():
+    index = FRONTEND_DIR / "index.html"
+    if index.exists(): return HTMLResponse(index.read_text(encoding="utf-8"))
+    # Fallback to website
+    site_index = SITE_DIR / "index.html"
+    if site_index.exists(): return HTMLResponse(site_index.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>Nothing built yet. Run start.bat</h1>")
+
+# Serve frontend JS/CSS assets
+@app.get("/assets/{path:path}")
+def serve_frontend_assets(path: str):
+    f = FRONTEND_DIR / "assets" / path
+    if f.exists() and f.is_file():
+        import mimetypes
+        ct = mimetypes.guess_type(str(f))[0] or "application/octet-stream"
+        return FileResponse(str(f), media_type=ct)
+    raise HTTPException(404)
 
 @app.get("/site", response_class=HTMLResponse)
 @app.get("/site/", response_class=HTMLResponse)
