@@ -3,7 +3,7 @@ ExtractFlow AI — Full Backend Server
 NotebookLM-killer: RAG chat + slides + infographics + podcasts + video
 35+ local GGUF models from HuggingFace
 """
-import os, json, hashlib, shutil, threading, time, re, textwrap, base64, uuid
+import os, json, hashlib, shutil, threading, time, re, textwrap, base64, uuid, io
 from pathlib import Path
 from collections import Counter
 from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
@@ -92,6 +92,7 @@ downloads = {}
 slides_cache = {}
 infographics_cache = {}
 podcasts_cache = {}
+mindmaps_cache = {}
 
 
 def broadcast(event, data):
@@ -187,6 +188,46 @@ def generate_infographic_content(text, title="Infographic"):
         "keyNumbers": numbers[:8],
         "wordCount": len(text.split()),
         "sentenceCount": len(sentences),
+    }
+
+
+def generate_mindmap(text, title="Mind Map"):
+    """Generate mind map hierarchy from document text."""
+    paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 30]
+    topics = extract_key_topics(text)
+    # Build tree: root -> main sections -> sub-points
+    root = {"label": title, "children": []}
+    for i, para in enumerate(paragraphs[:8]):
+        sentences = [s.strip() for s in re.split(r'[.!?]+', para) if len(s.strip()) > 15]
+        section_label = sentences[0][:60] if sentences else f"Section {i+1}"
+        children = []
+        for sent in sentences[1:4]:
+            words = sent.split()
+            child_label = " ".join(words[:8])[:50]
+            if len(words) > 8:
+                child_label += "..."
+            grandchildren = []
+            for w in words[8:14]:
+                grandchildren.append({"label": w, "children": []})
+            children.append({"label": child_label, "children": grandchildren})
+        root["children"].append({"label": section_label, "children": children})
+    return root
+
+
+def generate_summary(text, title="Document Summary"):
+    """Generate a structured summary with key findings."""
+    paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 30]
+    topics = extract_key_topics(text)
+    numbers = re.findall(r'\$?[\d,]+\.?\d*\s*(?:billion|million|trillion|GW|GWh|kWh|percent|%)', text, re.IGNORECASE)
+    sentences = [s.strip() for s in re.split(r'[.!?]+', text) if len(s.strip()) > 20]
+    return {
+        "title": title,
+        "overview": paragraphs[0][:300] if paragraphs else "No content available.",
+        "keyFindings": [s.strip()[:150] for s in sentences[:5]],
+        "keyNumbers": numbers[:10],
+        "topTopics": [t["topic"].title() for t in topics[:8]],
+        "sectionCount": len(paragraphs),
+        "wordCount": len(text.split()),
     }
 
 
@@ -372,10 +413,25 @@ def delete_model(mid: str):
 
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...)):
-    text = (await file.read()).decode("utf-8", errors="ignore")
+    content = await file.read()
+    fname = file.filename.lower()
+    if fname.endswith(".pdf"):
+        try:
+            import PyPDF2
+            reader = PyPDF2.PdfReader(io.BytesIO(content))
+            text = "\n\n".join(page.extract_text() or "" for page in reader.pages)
+        except ImportError:
+            text = content.decode("utf-8", errors="ignore")
+        except Exception as e:
+            text = f"PDF extraction error: {e}"
+    else:
+        text = content.decode("utf-8", errors="ignore")
+    if not text.strip():
+        raise HTTPException(400, "Could not extract text from file")
     did = hashlib.md5(text.encode()).hexdigest()[:12]
     documents[did] = {"name": file.filename, "text": text, "chunks": chunk_text(text)}
-    return {"id": did, "name": file.filename, "chunks": len(documents[did]["chunks"]), "chars": len(text)}
+    summary = generate_summary(text, file.filename)
+    return {"id": did, "name": file.filename, "chunks": len(documents[did]["chunks"]), "chars": len(text), "summary": summary}
 
 
 @app.post("/api/paste")
@@ -523,6 +579,70 @@ def get_podcast(pod_id: str):
     return {"id": pod_id, "script": podcasts_cache[pod_id]}
 
 
+@app.post("/api/generate/mindmap")
+def generate_mindmap_endpoint(body: dict):
+    title = body.get("title", "Mind Map")
+    doc_id = body.get("doc_id")
+    text = ""
+    if doc_id and doc_id in documents:
+        text = documents[doc_id]["text"]
+    elif documents:
+        text = list(documents.values())[0]["text"]
+    else:
+        raise HTTPException(400, "No documents loaded")
+    tree = generate_mindmap(text, title)
+    mm_id = str(uuid.uuid4())[:8]
+    mindmaps_cache[mm_id] = tree
+    return {"id": mm_id, "tree": tree}
+
+
+@app.get("/api/mindmap/{mm_id}")
+def get_mindmap(mm_id: str):
+    if mm_id not in mindmaps_cache:
+        raise HTTPException(404, "Mind map not found")
+    return {"id": mm_id, "tree": mindmaps_cache[mm_id]}
+
+
+@app.get("/api/export/mindmap/{mm_id}")
+def export_mindmap(mm_id: str):
+    if mm_id not in mindmaps_cache:
+        raise HTTPException(404, "Mind map not found")
+    tree = mindmaps_cache[mm_id]
+    html = _render_mindmap_html(tree)
+    out_path = OUTPUT_DIR / f"mindmap_{mm_id}.html"
+    out_path.write_text(html, encoding="utf-8")
+    return FileResponse(str(out_path), media_type="text/html", filename="mindmap.html")
+
+
+@app.post("/api/generate/video")
+def generate_video(body: dict):
+    """Generate a video from slides + narration."""
+    doc_id = body.get("doc_id")
+    title = body.get("title", "Document Summary")
+    text = ""
+    if doc_id and doc_id in documents:
+        text = documents[doc_id]["text"]
+    elif documents:
+        text = list(documents.values())[0]["text"]
+    else:
+        raise HTTPException(400, "No documents loaded")
+    # Generate slides for video
+    slides = generate_slides_content(text, title)
+    slide_id = str(uuid.uuid4())[:8]
+    slides_cache[slide_id] = slides
+    # Generate podcast script for narration
+    script = generate_podcast_script(text, title)
+    pod_id = str(uuid.uuid4())[:8]
+    podcasts_cache[pod_id] = script
+    return {
+        "slideId": slide_id,
+        "podcastId": pod_id,
+        "slides": slides,
+        "script": script,
+        "message": "Video assets generated. Use slides for visuals and podcast for narration."
+    }
+
+
 @app.get("/api/export/slides/{slide_id}")
 def export_slides(slide_id: str):
     if slide_id not in slides_cache:
@@ -573,6 +693,39 @@ function render(){{document.querySelectorAll('.slide').forEach(s=>s.classList.re
 function next(){{cur=(cur+1)%S.length;render()}}function prev(){{cur=(cur-1+S.length)%S.length;render()}}
 document.addEventListener('keydown',e=>{{if(e.key==='ArrowRight')next();if(e.key==='ArrowLeft')prev()}});
 const dots=document.getElementById('dots');S.forEach((_,i)=>{{const s=document.createElement('span');s.onclick=()=>{{cur=i;render()}};dots.appendChild(s)}});render();
+</script></body></html>"""
+
+
+def _render_mindmap_html(tree):
+    tree_json = json.dumps(tree)
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Mind Map</title>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Inter',system-ui,sans-serif;background:#06080f;color:#e8edf5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px}}
+.tree{{display:flex;flex-direction:column;align-items:center;gap:20px}}
+.node{{background:rgba(12,18,35,0.8);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 20px;font-size:0.85rem;font-weight:600;text-align:center;backdrop-filter:blur(12px);transition:all .3s;cursor:default;max-width:280px}}
+.node:hover{{border-color:rgba(16,185,129,0.4);box-shadow:0 0 20px rgba(16,185,129,0.1)}}
+.root{{background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(99,102,241,0.1));border-color:rgba(16,185,129,0.3);font-size:1.1rem;padding:16px 28px}}
+.branch{{display:flex;flex-direction:column;align-items:center;gap:12px;position:relative}}
+.branch::before{{content:'';position:absolute;top:-20px;width:1px;height:20px;background:rgba(255,255,255,0.08)}}
+.children{{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}}
+.leaf{{font-size:0.75rem;color:#64748b;padding:8px 14px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04)}}
+.connector{{width:1px;height:16px;background:rgba(255,255,255,0.06)}}
+</style></head><body>
+<div id="root"></div>
+<script>
+const T={tree_json};
+function renderNode(n, isRoot){{
+  let html=`<div class="node ${{isRoot?'root':''}}">${{n.label}}</div>`;
+  if(n.children&&n.children.length){{
+    html+=`<div class="connector"></div><div class="children">`;
+    n.children.forEach(c=>{{html+=`<div class="branch">${{renderNode(c,false)}}</div>`}});
+    html+=`</div>`;
+  }}
+  return html;
+}}
+document.getElementById('root').innerHTML=`<div class="tree">${{renderNode(T,true)}}</div>`;
 </script></body></html>"""
 
 
