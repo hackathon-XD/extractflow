@@ -1425,6 +1425,141 @@ def _render_infographic_html(data):
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{data.get('title','Infographic')}</title><style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:Inter,system-ui,sans-serif;background:#06080f;color:#e8edf5;padding:40px;min-height:100vh}}.c{{max-width:800px;margin:0 auto}}h1{{font-size:2.5rem;font-weight:800;text-align:center;background:linear-gradient(135deg,#10b981,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}}.s{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:40px 0}}.st{{background:rgba(12,18,35,0.7);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:24px;text-align:center}}.sv{{font-size:2rem;font-weight:800}}.sl{{font-size:0.75rem;color:#64748b;margin-top:4px;text-transform:uppercase}}.sec{{background:rgba(12,18,35,0.7);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:24px;margin-bottom:16px;border-left:4px solid}}.sec h3{{font-weight:700;margin-bottom:8px}}.sec p{{font-size:0.85rem;color:#94a3b8;line-height:1.6}}.nums{{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:32px}}.num{{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:999px;padding:8px 20px;font-size:0.8rem;color:#94a3b8}}</style></head><body><div class="c" id="r"></div><script>const D={dj};document.getElementById('r').innerHTML=`<h1>${{D.title}}</h1><div class="s">${{D.stats.map(s=>`<div class="st"><div class="sv" style="color:${{s.color}}">${{s.value}}</div><div class="sl">${{s.label}}</div></div>`).join('')}}</div>${{D.sections.map(s=>`<div class="sec" style="border-left-color:${{s.color}}"><h3 style="color:${{s.color}}">${{s.heading}}</h3><p>${{s.body}}</p></div>`).join('')}}<div class="nums">${{D.keyNumbers.map(n=>`<div class="num">${{n}}</div>`).join('')}}</div>`;</script></body></html>"""
 
 
+# ═══ WEB SEARCH & SCRAPING ENDPOINTS ═══
+import urllib.request
+import urllib.parse
+from html.parser import HTMLParser
+
+try:
+    from bs4 import BeautifulSoup
+    HAS_BS4 = True
+except ImportError:
+    HAS_BS4 = False
+
+def ddg_search(query, max_results=20):
+    """Search DuckDuckGo Lite and extract results."""
+    import re
+    results = []
+    try:
+        url = f"https://lite.duckduckgo.com/lite/?q={urllib.parse.quote(query)}"
+        req = urllib.request.Request(url, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html'
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            html = resp.read().decode('utf-8', errors='ignore')
+        # DDG lite: result links have rel="nofollow" and wrap in uddg= redirect
+        links = re.findall(r'<a[^>]*rel="nofollow"[^>]*href="([^"]+)"[^>]*>(.*?)</a>', html)
+        for href, title_html in links[:max_results]:
+            title = re.sub(r'<[^>]+>', '', title_html).strip()
+            # Extract actual URL from uddg= param
+            uddg = re.search(r'uddg=([^&]+)', href)
+            real_url = urllib.parse.unquote(uddg.group(1)) if uddg else href
+            # Get snippet from next <td class="result-snippet"> if present
+            snippet = ''
+            idx = html.find(f'rel="nofollow" href="{href}"')
+            if idx > 0:
+                snippet_match = re.search(r'class="result-snippet">(.*?)</td>', html[idx:], re.DOTALL)
+                if snippet_match:
+                    snippet = re.sub(r'<[^>]+>', '', snippet_match.group(1)).strip()
+            results.append({
+                'title': title,
+                'url': real_url,
+                'snippet': snippet,
+                'source': urllib.parse.urlparse(real_url).netloc
+            })
+    except Exception as e:
+        print(f"Search error: {e}")
+    return results
+
+def scrape_url(url, max_chars=10000):
+    """Scrape a URL and extract readable text."""
+    try:
+        req = urllib.request.Request(url, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            html = resp.read().decode('utf-8', errors='ignore')
+        if HAS_BS4:
+            soup = BeautifulSoup(html, 'html.parser')
+            for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'aside']):
+                tag.decompose()
+            text = soup.get_text(separator='\n', strip=True)
+        else:
+            import re
+            text = re.sub(r'<[^>]+>', ' ', html)
+            text = re.sub(r'\s+', ' ', text)
+        return text[:max_chars]
+    except Exception as e:
+        return f"Error scraping {url}: {e}"
+
+@app.post("/api/notebooks/{nid}/sources/search")
+async def search_and_add_sources(nid: str, body: dict):
+    """Search the web and auto-add sources to a notebook."""
+    query = body.get('query', '').strip()
+    mode = body.get('mode', 'fast')  # fast or deep
+    if not query:
+        raise HTTPException(400, 'Query is required')
+
+    # Fast: search only. Deep: search + scrape top results
+    max_results = 15 if mode == 'fast' else 25
+    results = ddg_search(query, max_results=max_results)
+
+    sources_added = []
+    for r in results:
+        content = r['title']
+        if mode == 'deep' and r.get('url', '').startswith('http'):
+            scraped = scrape_url(r['url'])
+            if scraped and not scraped.startswith('Error'):
+                content = f"{r['title']}\n\nSource: {r['url']}\n\n{r.get('snippet', '')}\n\n{scraped}"
+            else:
+                content = f"{r['title']}\n\nSource: {r['url']}\n\n{r.get('snippet', '')}"
+        else:
+            content = f"{r['title']}\n\nSource: {r['url']}\n\n{r.get('snippet', '')}"
+
+        name = r['title'][:100] if r['title'] else 'Web Source'
+        sid = str(uuid.uuid4())[:12]
+        db.execute("INSERT INTO notebook_sources (id, notebook_id, name, source_type, content, url) VALUES (?, ?, ?, 'web', ?, ?)",
+                   (sid, nid, name, content, r.get('url', '')))
+        db.execute("UPDATE notebooks SET source_count = (SELECT COUNT(*) FROM notebook_sources WHERE notebook_id=?), updated_at=CURRENT_TIMESTAMP WHERE id=?", (nid, nid))
+        db.commit()
+        sources_added.append({'id': sid, 'name': name, 'url': r.get('url', ''), 'snippet': r.get('snippet', '')})
+
+    return {
+        'count': len(sources_added),
+        'mode': mode,
+        'query': query,
+        'sources': sources_added
+    }
+
+@app.post("/api/notebooks/{nid}/sources/scrape")
+async def scrape_and_add_url(nid: str, body: dict):
+    """Scrape a specific URL and add as source."""
+    url = body.get('url', '').strip()
+    if not url or not url.startswith('http'):
+        raise HTTPException(400, 'Valid URL is required')
+    text = scrape_url(url)
+    title = urllib.parse.urlparse(url).netloc.replace('www.', '')
+    sid = str(uuid.uuid4())[:12]
+    db.execute("INSERT INTO notebook_sources (id, notebook_id, name, source_type, content, url) VALUES (?, ?, ?, 'web', ?, ?)",
+               (sid, nid, title, text, url))
+    db.execute("UPDATE notebooks SET source_count = (SELECT COUNT(*) FROM notebook_sources WHERE notebook_id=?), updated_at=CURRENT_TIMESTAMP WHERE id=?", (nid, nid))
+    db.commit()
+    return {'id': sid, 'name': title, 'content': text[:200], 'url': url}
+
+@app.get("/api/app-info")
+def get_app_info():
+    """Return app metadata."""
+    clouds = db.execute("SELECT provider, api_key, model FROM cloud_config").fetchall()
+    return {
+        'cloud_providers': [{"provider": c[0], "has_key": bool(c[1]), "model": c[2]} for c in clouds],
+        'models_count': len(MODEL_CATALOG),
+        'app_name': 'ExtractFlow AI',
+        'version': '2.0.0',
+        'copyright': 'github.com/al13n-x-v0x | Discord: al13n._.invisible'
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=4000)
